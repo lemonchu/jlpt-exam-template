@@ -80,7 +80,10 @@ class ComponentLayout(MaterialPrimitives):
                 ax=x
                 for c in annotation:
                     self.glyph(c,6.4,ax,baseline+6.98,False,color);ax+=self.catalog.width(c,6.4,False,self.section)
-            if a.underline:self.rule(x,baseline+1.2,x+a.width,baseline+1.2,.33)
+            if a.underline:
+                # Match the reference underlines, measured about 3 bp below baseline.
+                underline_y=baseline+3.0
+                self.rule(x,underline_y,x+a.width,underline_y,.33)
             x+=a.width
     def hanging_lines(self,text,size,first_width,rest_width,bold=False):
         atoms=measure(parse(text,bold),self.catalog,size,self.section);result=[];line=[];used=0

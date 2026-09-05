@@ -1,8 +1,0 @@
-# Optional component defaults. Reference via components_file in a blueprint.
-components:
-  choice: {options_columns: auto}
-  word_order: {options_columns: auto}
-  reading: {options_columns: 1}
-  cloze: {options_columns: auto}
-  listening_choice: {options_columns: 1}
-  listening_compound: {options_columns: 1}

@@ -19,7 +19,6 @@ private/
 input-pdfs/
 output/
 dist/
-validation/local/
 __pycache__/
 *.py[cod]
 .venv/
@@ -32,6 +31,3 @@ __pycache__/
 *.log
 *.xdv
 *.synctex.gz
-
-/validation/build-integrity.json
-/validation/font-coverage.json

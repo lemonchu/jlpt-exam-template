@@ -99,7 +99,7 @@ groups:
 | `memo` | 可选 `label`，默认 `－メモ－`；可选 `height` 为该空白书写区固有高度，单位 bp |
 | `separator` | 两部分材料之间的空白间隔 |
 
-图像支持 PDF、PNG、JPEG；PDF 使用第一页。题干和选项不应以整页图片替代。独立广告和手写材料可以保留为图像；`alt` 的编辑不会修改图中的文字。第二套广告转录另见 `paper-b-advert-transcript.txt`。
+图像支持 PDF、PNG、JPEG；PDF 使用第一页。题干和选项不应以整页图片替代。独立广告和手写材料可以保留为图像；`alt` 的编辑不会修改图中的文字。
 
 表格列宽、纵排列高、图片排入位置等优先放在蓝图，而非内容字段。复合听力中未指定 `style` 的 `paragraph` 默认按作答说明的字号、行距和粗体排版。
 
@@ -128,7 +128,7 @@ groups:
 
 `components_file` 相对于蓝图目录，内容形如 `components: {reading: {options_columns: 1}}`；`group_defaults` 提供共用设置，显式组配置优先。相关题组的布局参数变化后，该题组重新排版；仅改变题组顺序时，可移动原组件并重新绘制页边装饰。
 
-其他支持字段及单位见 `ENGINE.md`，包括 `cover`、`header`、`sidebar`、`table_column_widths` 和 `layout: facing_pages`。侧边分区位置支持 `outer|inner|left|right`；`sidebar: false` 关闭。单个选项列数只支持 `auto`、1、2、4。
+其他常用字段包括 `cover`、`header`、`sidebar`、`table_column_widths` 和 `layout: facing_pages`，可参考仓库内的现有蓝图。侧边分区位置支持 `outer|inner|left|right`；`sidebar: false` 关闭。单个选项列数只支持 `auto`、1、2、4。
 
 `start_on: left|right` 指定题组的起始页奇偶性；插入的空白页计入封面页数。`page_number_start` 默认为1。`cover: false` 可省略封面和背页。
 
@@ -158,4 +158,4 @@ groups:
 
 项目 `fonts.yaml` 默认自动加载，使用 `faces` 将五个原字体名称映射到本地完整 OTF/TTF；原稿已有字形和同名字体的其他科目子集优先。可用 `--fonts other-fonts.yaml` 指定另一份本地路径配置。所有路径相对于项目根目录，也支持绝对路径。
 
-仓库不附字体，首次构建前须按 [FONTS.md](FONTS.md) 恢复原版子集并准备完整字体。该版本不跨原字体补字，也不启用通用替代字体；缺少文件或所需字形时明确报错。编辑内容不需要在 YAML 中写字体编号或逐字坐标。
+仓库附有现有 A/B 内容所需的字体子集。自编内容出现未收录字符时，按 [FONTS.md](FONTS.md) 配置对应的完整字体。该版本不跨原字体补字，也不启用通用替代字体；缺少文件或所需字形时明确报错。编辑内容不需要在 YAML 中写字体编号或逐字坐标。
