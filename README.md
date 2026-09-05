@@ -27,18 +27,18 @@ PDF 输出到 `output/N1-paper-a-written.pdf`。将 `paper-a` 改为 `paper-b` �
 - **改组卷**：编辑 `blueprints/`，调整题组、选题、编号和纸张边侧的分区标记。
 - **放广告或图表**：复杂材料可保存为独立 PDF、PNG 或 JPEG，由 YAML 引用；题干和选项仍是可编辑文字。
 
-字段与示例见 [内容指南](docs/CONTENT-GUIDE.md) 和 [YAML 参考](docs/SCHEMA.md)。
+字段与示例见 [内容指南](https://github.com/lemonchu/jlpt-exam-template/blob/dev/docs/CONTENT-GUIDE.md) 和 [YAML 参考](https://github.com/lemonchu/jlpt-exam-template/blob/dev/docs/SCHEMA.md)。
 
 ## 字体与精度
 
 内置子集只覆盖已有内容。写入未收录的新字时，需要在 `fonts.yaml` 中配置对应的完整字体：Ryumin、FutoGo B101、ShinGo 或 Gothic MB101。缺字会明确报错，不会悄悄换字体。
 
-可自行在 [ufonts.com](https://ufonts.com/) 按名称寻找。**非广告、无赞助、无返佣**；该站仅作为查找线索，请核对字体版本及许可。具体名称和配置见 [字体说明](docs/FONTS.md)。
+可自行在 [ufonts.com](https://ufonts.com/) 按名称寻找。**非广告、无赞助、无返佣**；该站仅作为查找线索，请核对字体版本及许可。具体名称和配置见 [字体说明](https://github.com/lemonchu/jlpt-exam-template/blob/dev/docs/FONTS.md)。
 
-原稿已有字形保留原轮廓；补充字形取自对应的现代字体版本，局部可能与旧版不同。修改内容或组卷后会重新排版，断行和页数也可能变化。构建与对照结果见 [验证记录](VALIDATION.md)。
+原稿已有字形保留原轮廓；补充字形取自对应的现代字体版本，局部可能与旧版不同。修改内容或组卷后会重新排版，断行和页数也可能变化。构建与对照结果见 [验证记录](https://github.com/lemonchu/jlpt-exam-template/blob/dev/VALIDATION.md)。
 
 ## 许可
 
-原创代码使用 [AGPLv3](LICENSE)。试题、引用文章、图像及字体归各自权利人所有，不受代码许可覆盖，见 [第三方说明](THIRD_PARTY_NOTICES.md)。本项目与 JLPT 官方无关联。
+原创代码使用 [AGPLv3](https://github.com/lemonchu/jlpt-exam-template/blob/dev/LICENSE)。试题、引用文章、图像及字体归各自权利人所有，不受代码许可覆盖，见 [第三方说明](https://github.com/lemonchu/jlpt-exam-template/blob/dev/THIRD_PARTY_NOTICES.md)。本项目与 JLPT 官方无关联。
 
 *Powered by GPT-6.*
