@@ -1,0 +1,76 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{n1-exact}[2026/09/05 N1 complete measured reconstruction]
+\RequirePackage{iftex}
+\RequireXeTeX
+\RequirePackage[paperwidth=595bp,paperheight=842bp,margin=0bp,noheadfoot]{geometry}
+\RequirePackage{fontspec}
+\RequirePackage{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage{eso-pic}
+\AtBeginDvi{\special{dvipdfmx:config d 5}}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\unitlength}{1bp}
+\input{fonts.tex}
+\definecolor{NInkColor}{rgb}{.13725,.12157,.12549}
+\newcommand{\NInkPDF}{.13725 .12157 .12549}
+\ExplSyntaxOn
+\RenewDocumentCommand{\NInkPDF}{}{.13725~.12157~.12549}
+\NewDocumentCommand{\NInk}{m}{\definecolor{NInkColor}{rgb}{#1}\tl_set:Nn\l_tmpa_tl{#1}\tl_replace_all:Nnn\l_tmpa_tl{,}{~}\cs_set:Npx\NInkPDF{\l_tmpa_tl}}
+\ExplSyntaxOff
+% Independently redrawn rules, boxes, clipping and fills, without text/page imports.
+\newcommand{\NVector}[1]{\put(0,0){\special{pdf:literal /DeviceRGB CS /DeviceRGB cs .13725 .12157 .12549 SCN #1}}}
+\ExplSyntaxOn
+\str_new:N \l_niv_run_str
+\NewExpandableDocumentCommand{\NGlyph}{m m}{\char_generate:nn{#2}{12}}
+\NewExpandableDocumentCommand{\NChar}{m}{\char_generate:nn{#1}{12}}
+\tl_new:N\l_niv_shear_tl
+\tl_new:N\l_niv_rotate_tl
+\tl_set:Nn\l_niv_rotate_tl{0}
+\NewDocumentCommand{\NRunRot}{m m m m m m m m}{\group_begin:\tl_set:Nn\l_niv_rotate_tl{#1}\NRun{#2}{#3}{#4}{#5}{#6}{#7}{#8}\group_end:}
+\tl_set:Nn\l_niv_shear_tl{0}
+\NewDocumentCommand{\NRunSkew}{m m m m m m m m}{\group_begin:\tl_set:Nn\l_niv_shear_tl{#1}\NRun{#2}{#3}{#4}{#5}{#6}{#7}{#8}\group_end:}
+\NewDocumentCommand{\NDefineText}{m m}{\cs_gset:cpn{NContent#1}{#2}}
+\NewExpandableDocumentCommand{\NGetText}{m}{\use:c{NContent#1}}
+\seq_new:N \l_niv_offsets_seq
+\tl_new:N \l_niv_offset_tl
+\box_new:N \l_niv_run_box
+\NewDocumentCommand{\NRun}{m m m m m m m}{
+  \group_begin:
+  \seq_set_split:Nnn \l_niv_offsets_seq {,} {#6}
+  \hbox_set:Nn \l_niv_run_box {
+    \use:c {NFont#1}
+    % Keep the native font just above the 12bp rasterization boundary; measured coordinates stay unchanged.
+    \fp_compare:nNnTF{#3}={12}{\fontsize{12.00001bp}{12bp}\selectfont}{\fontsize{#3bp}{#3bp}\selectfont}
+    \color{NInkColor}
+    \str_set:Nx\l_niv_run_str{#7}
+    \str_remove_all:Nn\l_niv_run_str{~}
+    \int_compare:nNnF{\str_count:N\l_niv_run_str}={\seq_count:N\l_niv_offsets_seq}{\PackageError{n1-exact}{Text~length~differs~from~measured~glyph~slots}{Preserve~character~count,~or~use~NText~for~new~content.}}
+    \str_map_inline:Nn \l_niv_run_str {
+      \seq_pop_left:NN \l_niv_offsets_seq \l_niv_offset_tl
+      \rlap{\kern\l_niv_offset_tl bp\hbox{\special{pdf:literal~\NInkPDF\c_space_tl rg}##1}}
+    }
+  }
+  \put(#4bp,#5bp){
+    \fp_compare:nNnF{\l_niv_rotate_tl}={0}{\special{pdf:btrans~rotate~\l_niv_rotate_tl}}
+    \fp_compare:nNnTF{\l_niv_shear_tl}={0}{
+      \scalebox{\fp_eval:n{#2/#3}}[1]{\box_use:N\l_niv_run_box}
+    }{
+      \special{pdf:btrans~matrix~1~0~\l_niv_shear_tl\c_space_tl 1~0~0}
+      \scalebox{\fp_eval:n{#2/#3}}[1]{\box_use:N\l_niv_run_box}
+      \special{pdf:etrans}
+    }
+    \fp_compare:nNnF{\l_niv_rotate_tl}={0}{\special{pdf:etrans}}
+  }
+  \group_end:
+}
+% A reusable line using automatic font advances; PDF bp, bottom-left origin.
+\NewDocumentCommand{\NText}{O{V010} m m m m}{
+  \put(#3bp,#4bp){\group_begin:\use:c{NFont#1}\fontsize{#2bp}{#2bp}\selectfont\color{NInkColor}#5\group_end:}
+}
+\ExplSyntaxOff
+\newcommand{\NImage}[5]{\put(#4bp,#5bp){\special{pdf:image width #2bp height #3bp (#1)}}}
+\newcommand{\NPage}[1]{%
+  \AddToShipoutPictureBG*{\special{pdf:put @thispage << /TrimBox [0 0.05 595 841.94] /BleedBox [0 0.05 595 841.94] >>}\AtPageLowerLeft{\setlength{\unitlength}{1bp}\begin{picture}(0,0)\input{#1}\end{picture}}}%
+  \null\clearpage
+}

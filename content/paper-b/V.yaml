@@ -1,0 +1,275 @@
+# 第二套词汇：从 N1V(1).pdf 扫描逐题目视转录，扫描版错位与出版物外侧页码不进入内容。
+# ｜漢字《かんじ》=原稿注音，__下線__=原稿下划线；所有错误选项仍按原稿保留。
+schema_version: 1
+section: V
+groups:
+- id: V1
+  kind: choice
+  title: 問題１
+  instruction: __　　　__の言葉の読み方として最もよいものを、１・２・３・４から一つ選びなさい。
+  items:
+  - id: V-01
+    source_number: 1
+    prompt: 去年より__利益__がわずかに増えた。
+    options:
+    - りし
+    - りそく
+    - りえき
+    - りじゅん
+    source_pages:
+    - 3
+  - id: V-02
+    source_number: 2
+    prompt: ｜橋本《はしもと》選手の活躍で、なんとかピンチを__逃れた__。
+    options:
+    - のがれた
+    - はなれた
+    - それた
+    - まぬがれた
+    source_pages:
+    - 3
+  - id: V-03
+    source_number: 3
+    prompt: 子どものおもちゃは、安全性を__考慮__して選ぶようにしている。
+    options:
+    - こうろ
+    - こうりょ
+    - こうろう
+    - こうりょう
+    source_pages:
+    - 3
+  - id: V-04
+    source_number: 4
+    prompt: この辺りは視界を__遮る__物が何もない。
+    options:
+    - さまたげる
+    - さえぎる
+    - せばめる
+    - へだてる
+    source_pages:
+    - 3
+  - id: V-05
+    source_number: 5
+    prompt: この説は科学的な__根拠__に乏しい。
+    options:
+    - こんしょ
+    - こんじょ
+    - こんきょ
+    - こんぎょ
+    source_pages:
+    - 3
+  - id: V-06
+    source_number: 6
+    prompt: 何事も初めが__肝心__だ。
+    options:
+    - たんしん
+    - かんしん
+    - たんじん
+    - かんじん
+    source_pages:
+    - 3
+- id: V2
+  kind: choice
+  title: 問題２
+  instruction: （　　　）に入れるのに最もよいものを、１・２・３・４から一つ選びなさい。
+  items:
+  - id: V-07
+    source_number: 7
+    prompt: 物置の隅で、ほこり（　　　）になっている古い人形を見つけた。
+    options:
+    - ぐるみ
+    - がらみ
+    - まみれ
+    - ずくめ
+    source_pages:
+    - 4
+  - id: V-08
+    source_number: 8
+    prompt: ｜木村《きむら》さんとは共通の趣味があるので、いつも会話が（　　　）。
+    options:
+    - 舞う
+    - 弾む
+    - 転がる
+    - 跳ねる
+    source_pages:
+    - 4
+  - id: V-09
+    source_number: 9
+    prompt: 地域の（　　　）に合った医療のシステムが求められている。
+    options:
+    - 実情
+    - 実況
+    - 実権
+    - 実在
+    source_pages:
+    - 4
+  - id: V-10
+    source_number: 10
+    prompt: その選手は、十年に一人の（　　　）だと言われている。
+    options:
+    - ｜玄人《くろうと》
+    - ｜大家《たいか》
+    - ｜巨匠《きょしょう》
+    - ｜逸材《いつざい》
+    source_pages:
+    - 4
+  - id: V-11
+    source_number: 11
+    prompt: 書類に（　　　）があった場合、申請は受理されません。
+    options:
+    - 不穏
+    - 不当
+    - 不備
+    - 不順
+    source_pages:
+    - 4
+  - id: V-12
+    source_number: 12
+    prompt: 約300年前の絵画の（　　　）が終わり、来月から公開される予定だ。
+    options:
+    - 回復
+    - 修復
+    - 復旧
+    - 復興
+    source_pages:
+    - 4
+  - id: V-13
+    source_number: 13
+    prompt: 経済だけでなく、法律にも詳しいのが彼の（　　　）だ。
+    options:
+    - 深み
+    - 強み
+    - 高み
+    - 重み
+    source_pages:
+    - 4
+- id: V3
+  kind: choice
+  title: 問題３
+  instruction: __　　　__の言葉に意味が最も近いものを、１・２・３・４から一つ選びなさい。
+  items:
+  - id: V-14
+    source_number: 14
+    prompt: この映画は__画期的な__手法で製作された。
+    options:
+    - 広く知られている
+    - 最近ではめずらしい
+    - 非常に時間がかかる
+    - 今までになく新しい
+    source_pages:
+    - 5
+  - id: V-15
+    source_number: 15
+    prompt: あの企業は海外市場への進出を__もくろんで__いる。
+    options:
+    - 計画して
+    - 果たして
+    - 開始して
+    - あきらめて
+    source_pages:
+    - 5
+  - id: V-16
+    source_number: 16
+    prompt: 問題を解決するために、もう少し__手がかり__が欲しい。
+    options:
+    - イメージ
+    - サポート
+    - チャンス
+    - ヒント
+    source_pages:
+    - 5
+  - id: V-17
+    source_number: 17
+    prompt: あの人の話は__にわかには__信じられない。
+    options:
+    - すぐには
+    - 完全には
+    - すなおには
+    - 簡単には
+    source_pages:
+    - 5
+  - id: V-18
+    source_number: 18
+    prompt: この｜鍋《なべ》は__重宝している__。
+    options:
+    - 以前より値上がりしている
+    - 形が気に入っている
+    - 評価が高まっている
+    - 便利で役に立っている
+    source_pages:
+    - 5
+  - id: V-19
+    source_number: 19
+    prompt: ｜中村《なかむら》さんは仕事に対していつも__シビアだ__。
+    options:
+    - 弱気だ
+    - 厳しい
+    - 柔軟だ
+    - 注意深い
+    source_pages:
+    - 5
+- id: V4
+  kind: choice
+  title: 問題４
+  instruction: 次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。
+  items:
+  - id: V-20
+    source_number: 20
+    prompt: 連携
+    options:
+    - 学校は地域と__連携__して生徒の安全を守っている。
+    - 複数の社員で一台のプリンターを__連携__して使っている。
+    - 最近の株価は、為替レートと__連携__して上下している。
+    - 登山のときには、必ず地図を__連携__してください。
+    source_pages:
+    - 6
+  - id: V-21
+    source_number: 21
+    prompt: 不服
+    options:
+    - 彼の失礼な態度は、そこにいた人々の__不服__を買った。
+    - カラオケで思い切り歌って、日ごろの__不服__を晴らそう。
+    - 審判の判定に__不服__を唱えることはできない。
+    - この部署で、お客様からの__不服__を受け付けています。
+    source_pages:
+    - 6
+  - id: V-22
+    source_number: 22
+    prompt: かなう
+    options:
+    - 苦労が__かない__、彼は俳優として成功をおさめた。
+    - 天気予報が__かない__、今日は一日中快晴だった。
+    - 準備を重ねてきたイベントが無事__かなった__。
+    - 自分の店を持つという夢が、とうとう__かなった__。
+    source_pages:
+    - 6
+  - id: V-23
+    source_number: 23
+    prompt: 目覚ましい
+    options:
+    - あの新人選手は__目覚ましい__成長を見せている。
+    - 上の階で__目覚ましい__ほどの大きな物音がした。
+    - この赤はとても__目覚ましい__色で人目をひくね。
+    - 夕べ早く寝たので、今朝はとても__目覚ましい__。
+    source_pages:
+    - 6
+  - id: V-24
+    source_number: 24
+    prompt: ほどける
+    options:
+    - ねじが__ほどけて__、イスがぐらぐらしている。
+    - 靴のひもが__ほどけない__ようにしっかりと結んだ。
+    - シャツのボタンが__ほどけて__いるから、とめた方がいいよ。
+    - グラスに浮かぶ氷がみるみるうちに__ほどけた__。
+    source_pages:
+    - 6
+  - id: V-25
+    source_number: 25
+    prompt: 赴任
+    options:
+    - 明日から三日間｜東京《とうきょう》へ__赴任__しなければならない。
+    - 新入社員の研修では、実際に売り場にも__赴任__してもらう。
+    - 部長が海外の支社に__赴任__するので、みんなで送別会を開いた。
+    - ｜田中《たなか》氏が新しい社長に__赴任__することが発表された。
+    source_pages:
+    - 7

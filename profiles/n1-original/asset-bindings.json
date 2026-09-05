@@ -1,0 +1,19 @@
+{
+  "assets/V-p02-Im1.jpeg": {
+    "section": "V",
+    "metadata_pointer": "/assets/written_back"
+  },
+  "assets/L-p02-Im1.jpeg": {
+    "section": "L",
+    "metadata_pointer": "/assets/listening_back"
+  },
+  "assets/R-p18-Im1.jpeg": {
+    "section": "R",
+    "metadata_pointer": "/assets/reading_interleaf"
+  },
+  "assets/R-p19-Im2-mask.pdf": {
+    "section": "R",
+    "file": "R.yaml",
+    "pointer": "/groups/5/items/0/questions/0/stimulus/1/asset"
+  }
+}

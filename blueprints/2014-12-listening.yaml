@@ -1,0 +1,32 @@
+schema_version: 1
+page:
+  width: 595
+  height: 842
+  margin_top: 61.4489
+  body_bottom: 783
+  font_size: 14.2
+  line_height: 28.35
+numbering:
+  start: 1
+  mode: per_group
+cover: true
+sidebar: false
+group_defaults:
+  new_page: true
+  options_columns: 1
+  font_size: 14.2
+  line_height: 28.35
+  question_gap: 14.13
+  heading_layout: stacked
+  heading_size: 36
+  instruction_font_size: 11.3
+  instruction_line_height: 25.47
+  example_separate_page: true
+  items_per_page: 2
+groups:
+- id: L1
+- id: L2
+- id: L3
+- id: L4
+- id: L5
+components_file: components.yaml
