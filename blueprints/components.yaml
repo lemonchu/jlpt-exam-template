@@ -1,0 +1,15 @@
+components:
+  choice:
+    options_columns: auto
+  word_order:
+    options_columns: auto
+  reading:
+    options_columns: 1
+  cloze:
+    options_columns: auto
+    material_line_height: 19.8
+    questions_new_page: true
+  listening_choice:
+    options_columns: 1
+  listening_compound:
+    options_columns: 1

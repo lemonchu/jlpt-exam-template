@@ -1,0 +1,9 @@
+# A/B 示例可直接用随附子集编译；完整字体仅在自行命题超出字库时需要。
+# 填写你本地的同款完整 OTF/TTF 路径；不自动下载或替换字体。
+schema_version: 1
+faces:
+  Ryumin-regular: null
+  FutoGoB101-Bold: null
+  ShinGo-regular: null
+  ShinGo-Bold: null
+  GothicMB101-Bold: null

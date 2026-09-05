@@ -1,0 +1,62 @@
+schema_version: 1
+labels:
+  booklet: 問題用紙
+  notes_ja: 注意
+  notes_en: Notes
+  registration: 受験番号 Examinee Registration Number
+  name: 名前 Name
+  notice_prefix: '{number}．'
+  duration: （{minutes}分）
+  header: '{subject}－{page}'
+  footer_mark: ―
+  page_number: '{page}'
+booklets:
+  written:
+    title: N1
+    subject_ja: 言語知識（文字・語彙・文法）・読解
+    subject_en: Language Knowledge（Vocabulary/Grammar）・Reading
+    time_minutes: 110
+    notices:
+    - text: 試験が始まるまで、この問題用紙を開けないでください。
+      english: Do not open this question booklet until the test begins.
+    - text: この問題用紙を持って帰ることはできません。
+      english: Do not take this question booklet with you after the test.
+    - text: 受験番号と名前を下の欄に、受験票と同じように書いてください。
+      english: Write your examinee registration number and name clearly in each box
+        below as written on your test voucher.
+    - text: この問題用紙は、全部で{body_pages}ページあります。
+      english: This question booklet has {body_pages} pages.
+    - text: 問題には解答番号の1、2、3…が付いています。解答は、解答用紙にある同じ番号のところにマークしてください。
+      english: One of the row numbers 1, 2, 3 … is given for each question. Mark your
+        answer in the same row of the answer sheet.
+  listening:
+    title: N1
+    subject_ja: 聴解
+    subject_en: Listening
+    time_minutes: 60
+    notices:
+    - text: 試験が始まるまで、この問題用紙を開けないでください。
+      english: Do not open this question booklet until the test begins.
+    - text: この問題用紙を持って帰ることはできません。
+      english: Do not take this question booklet with you after the test.
+    - text: 受験番号と名前を下の欄に、受験票と同じように書いてください。
+      english: Write your examinee registration number and name clearly in each box
+        below as written on your test voucher.
+    - text: この問題用紙は、全部で{body_pages}ページあります。
+      english: This question booklet has {body_pages} pages.
+    - text: この問題用紙にメモをとってもかまいません。
+      english: You may make notes in this question booklet.
+sections:
+  V:
+    sidebar_label: 文字・語彙
+  G:
+    sidebar_label: 文法
+  R:
+    sidebar_label: 読解
+  L:
+    sidebar_label: 聴解
+schema_kind: exam_metadata
+assets:
+  written_back: assets/V-p02-Im1.jpeg
+  listening_back: assets/L-p02-Im1.jpeg
+  reading_interleaf: assets/R-p18-Im1.jpeg

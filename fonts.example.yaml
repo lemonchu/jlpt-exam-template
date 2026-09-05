@@ -1,0 +1,13 @@
+# 复制为 fonts.yaml 后，build.py 自动读取；--fonts 可指定其它配置。
+# OTF/TTF 路径相对于项目根目录，也支持绝对路径。
+# 原字形、其它科目的同名字体、随附样张子集优先；以下完整字体仅补充缺字。
+schema_version: 1
+# 精确指定原字体名称；各字体不会用于其它原字体的补字。
+# 可用名称见 profiles/n1-original/font-catalog.json。
+faces:
+  Ryumin-regular: null       # resources/user-fonts/Ryumin-Regular.otf
+  FutoGoB101-Bold: null      # resources/user-fonts/FutoGo-Bold.otf
+  ShinGo-regular: null      # resources/user-fonts/ShinGo-Regular.otf
+  ShinGo-Bold: null         # resources/user-fonts/ShinGo-Bold.otf
+  GothicMB101-Bold: null    # resources/user-fonts/GothicMB101-Bold.otf
+# 不填写路径即可编译两套现有 A/B。超出随附字库时配置同款完整版，不启用通用字族替代。

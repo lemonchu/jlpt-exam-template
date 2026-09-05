@@ -1,0 +1,189 @@
+{
+  "blueprints": {
+    "written": {
+      "schema_version": 1,
+      "page": {
+        "width": 595,
+        "height": 842,
+        "margin_top": 62.4928,
+        "body_bottom": 783,
+        "font_size": 11.3,
+        "line_height": 24.05996
+      },
+      "numbering": {
+        "start": 1,
+        "mode": "continuous"
+      },
+      "cover": true,
+      "sidebar": {
+        "position": "outer"
+      },
+      "group_defaults": {
+        "new_page": true,
+        "options_columns": "auto",
+        "question_gap": 14.13,
+        "passages_new_page": true,
+        "material_question_gap": 24.06
+      },
+      "groups": [
+        {
+          "id": "V1"
+        },
+        {
+          "id": "V2"
+        },
+        {
+          "id": "V3"
+        },
+        {
+          "id": "V4",
+          "options_columns": 1
+        },
+        {
+          "id": "G5"
+        },
+        {
+          "id": "G6",
+          "table_column_widths": {
+            "6": [
+              0.13,
+              0.165,
+              0.11,
+              0.19,
+              0.11,
+              0.295
+            ]
+          }
+        },
+        {
+          "id": "G7"
+        },
+        {
+          "id": "R8",
+          "options_columns": 1
+        },
+        {
+          "id": "R9",
+          "options_columns": 1,
+          "start_on": "left"
+        },
+        {
+          "id": "R10",
+          "options_columns": 1
+        },
+        {
+          "id": "R11",
+          "options_columns": 1
+        },
+        {
+          "id": "R12",
+          "options_columns": 1
+        },
+        {
+          "id": "R13",
+          "options_columns": 1,
+          "layout": "facing_pages"
+        }
+      ],
+      "components_file": "components.yaml"
+    },
+    "listening": {
+      "schema_version": 1,
+      "page": {
+        "width": 595,
+        "height": 842,
+        "margin_top": 61.4489,
+        "body_bottom": 783,
+        "font_size": 14.2,
+        "line_height": 28.35
+      },
+      "numbering": {
+        "start": 1,
+        "mode": "per_group"
+      },
+      "cover": true,
+      "sidebar": false,
+      "group_defaults": {
+        "new_page": true,
+        "options_columns": 1,
+        "font_size": 14.2,
+        "line_height": 28.35,
+        "question_gap": 14.13,
+        "heading_layout": "stacked",
+        "heading_size": 36,
+        "instruction_font_size": 11.3,
+        "instruction_line_height": 25.47,
+        "example_separate_page": true,
+        "items_per_page": 2
+      },
+      "groups": [
+        {
+          "id": "L1"
+        },
+        {
+          "id": "L2"
+        },
+        {
+          "id": "L3"
+        },
+        {
+          "id": "L4"
+        },
+        {
+          "id": "L5"
+        }
+      ],
+      "components_file": "components.yaml"
+    }
+  },
+  "components": {
+    "written": {
+      "components": {
+        "choice": {
+          "options_columns": "auto"
+        },
+        "word_order": {
+          "options_columns": "auto"
+        },
+        "reading": {
+          "options_columns": 1
+        },
+        "cloze": {
+          "options_columns": "auto",
+          "material_line_height": 19.8,
+          "questions_new_page": true
+        },
+        "listening_choice": {
+          "options_columns": 1
+        },
+        "listening_compound": {
+          "options_columns": 1
+        }
+      }
+    },
+    "listening": {
+      "components": {
+        "choice": {
+          "options_columns": "auto"
+        },
+        "word_order": {
+          "options_columns": "auto"
+        },
+        "reading": {
+          "options_columns": 1
+        },
+        "cloze": {
+          "options_columns": "auto",
+          "material_line_height": 19.8,
+          "questions_new_page": true
+        },
+        "listening_choice": {
+          "options_columns": 1
+        },
+        "listening_compound": {
+          "options_columns": 1
+        }
+      }
+    }
+  }
+}
