@@ -12,8 +12,8 @@ labels:
   page_number: '{page}'
 booklets:
   written:
-    session_label: null
-    form_symbol: null
+    session_label: "（２０１４－２）"
+    form_symbol: A
     title: N1
     subject_ja: 言語知識（文字・語彙・文法）・読解
     subject_en: Language Knowledge（Vocabulary/Grammar）・Reading
@@ -32,8 +32,8 @@ booklets:
       english: One of the row numbers 1, 2, 3 … is given for each question. Mark your
         answer in the same row of the answer sheet.
   listening:
-    session_label: null
-    form_symbol: null
+    session_label: "（２０１４－２）"
+    form_symbol: B
     title: N1
     subject_ja: 聴解
     subject_en: Listening

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render all measured slots exclusively from caller-supplied semantic text."""
 import argparse,json,os,re,shutil,subprocess,sys
-from dataclasses import dataclass
+from dataclasses import dataclass,field
 from pathlib import Path
 from functools import lru_cache
 from fontTools.ttLib import TTFont
@@ -18,9 +18,26 @@ class Font:
     cmap:dict
     manifest:list
 
+@dataclass(frozen=True)
+class _RenderInputs:
+    resources:Path
+    out:Path
+    layout:dict
+    resolved:dict
+    bindings:dict
+    sections:list
+
+@dataclass
+class _RenderState:
+    contents:list=field(default_factory=list)
+    fallback_glyphs:list=field(default_factory=list)
+    run_count:int=0
+    slot_count:int=0
+    drawn:int=0
+
 class Resolver:
     def __init__(self,resources):
-        self.resources=Path(resources);data=json.loads((self.resources/'font-catalog.json').read_text());self.fonts={};self.used=set();self.used_codes={};self.fallback_events=[]
+        self.resources=Path(resources);data=json.loads((self.resources/'font-catalog.json').read_text());self.fonts={};self.used=set();self.used_codes={};self.fallback_events=[];self._resolve_impl=None
         sample_path=self.resources/'sample-fonts.json'
         samples=json.loads(sample_path.read_text())['fonts'] if sample_path.is_file() else {}
         catalog={**data['fonts'],**samples,**data.get('fallback_fonts',{})}
@@ -67,23 +84,9 @@ class Resolver:
         return cp if cp in font.cmap and font.cmap[cp]!='.notdef' else None
     @lru_cache(maxsize=None)
     def resolve(self,fontid,text,form='normal'):
-        if not isinstance(text,str) or not text:raise GlyphError('Every semantic slot must supply non-empty text')
-        for char in text:
-            cp=ord(char)
-            if 0xE000<=cp<=0xF8FF or 0xF0000<=cp<=0xFFFFD or 0x100000<=cp<=0x10FFFD:raise GlyphError('Private-use codepoints are not accepted as semantic text; supply the character and generic form')
-            if cp<32 and char not in ' \t':raise GlyphError(f'Control code U+{cp:04X} is not semantic text')
-        if text.isspace():return None,None
-        original=self.fonts[fontid];code=self.native(original,text,form)
-        if code is not None:return fontid,code
-        # Deterministic family routing; no original character is retained or compared.
-        def rank(f):
-            r=f.record;o=original.record
-            return (r.get('bold',False)!=o.get('bold',False),r.get('family') not in (o.get('family'),'fallback'),r.get('family')=='fallback',r.get('section')!=o.get('section'),r.get('priority',1),f.id)
-        candidates=sorted((f for f in self.fonts.values() if f.id!=fontid),key=rank)
-        for f in candidates:
-            code=self.native(f,text,form)
-            if code is not None:return f.id,code
-        raise GlyphError(f'No glyph covers {text!r} with form={form!r}; original font was {fontid}')
+        if self._resolve_impl is None:
+            raise RuntimeError('Install the font policy before resolving glyphs')
+        return self._resolve_impl(fontid,text,form)
     def use(self,fontid,text,form,runid,index):
         target,code=self.resolve(fontid,text,form)
         if target:
@@ -91,12 +94,22 @@ class Resolver:
             if target!=fontid:self.fallback_events.append({'run_id':runid,'index':index,'from_font':fontid,'to_font':target,'text':text,'form':form})
         return target,code
     def export(self,out):
+        shutil.rmtree(out/'fonts',ignore_errors=True)
         lines=[]
         for fid in sorted(self.used):
-            f=self.fonts[fid];rel=Path(f.record['file']);target=out/rel;target.parent.mkdir(parents=True,exist_ok=True)
-            if f.record.get('family')=='fallback':export_subset(self.resources/rel,target,self.used_codes[fid])
-            else:shutil.copyfile(self.resources/rel,target)
-            lines.append('\\expandafter\\newfontfamily\\csname NFont%s\\endcsname[Path=%s/]{%s}'%(fid,rel.parent.as_posix(),rel.name))
+            f=self.fonts[fid];source=Path(f.record['file'])
+            if not source.is_absolute():source=self.resources/source
+            if f.record.get('user_supplied'):
+                font_dir=source.parent
+                font_name=source.name
+            else:
+                rel=Path(f.record['file']);target=out/rel;target.parent.mkdir(parents=True,exist_ok=True)
+                if f.record.get('family')=='fallback':export_subset(source,target,self.used_codes[fid])
+                else:shutil.copyfile(source,target)
+                font_dir=rel.parent;font_name=rel.name
+            directory=font_dir.as_posix().rstrip('/')+'/'
+            features=[f'Path={{{directory}}}',*f.record.get('fontspec_features',[])]
+            lines.append('\\expandafter\\newfontfamily\\csname NFont%s\\endcsname[%s]{%s}'%(fid,','.join(features),font_name))
         (out/'fonts.tex').write_text('\n'.join(lines)+'\n')
 
 def supplied_slots(value,run):
@@ -121,80 +134,110 @@ def supplied_slots(value,run):
 
 def number(x):return format(float(x),'.12g')
 
-def render(args):
+def _load_inputs(args):
     resources=Path(args.resources).resolve();out=Path(args.output_dir).resolve()
     if out==resources or out.is_relative_to(resources) or resources.is_relative_to(out):raise ValueError('Generated output must be separate from the text-free layout resources')
     out.mkdir(parents=True,exist_ok=True)
+    (out/'render-report.json').unlink(missing_ok=True)
+    if not args.compile:(out/'main.pdf').unlink(missing_ok=True)
     layout=json.loads(Path(getattr(args,'scene',None) or resources/'layout.json').read_text());resolved=json.loads(Path(args.resolved).read_text())
     if resolved.get('schema_version')!=1:raise ValueError('Unsupported resolved schema version')
     bindings=resolved.get('runs')
     if not isinstance(bindings,dict):raise ValueError('resolved.runs must be a mapping keyed by run_id')
     sections=args.sections.split(',')
     if len(sections)!=len(set(sections)) or any(s not in layout['sections'] for s in sections):raise ValueError('Unknown or duplicated section selection')
-    resolver=Resolver(resources)
-    from font_overrides import install_overrides
-    font_policy=install_overrides(resolver,getattr(args,'font_config',None),getattr(args,'project_root',None))
-    contents=[];pages=[];run_count=slot_count=0;drawn=0;used_runs=[];fallback_glyphs=[]
-    for section in sections:
-        for page in layout['sections'][section]['pages']:
-            output=[]
-            for command in page['commands']:
-                kind=command['type']
-                if kind=='vector':output.append('\\NVector{\n'+command['pdf']+'\n}')
-                elif kind=='ink':output.append('\\NInk{'+','.join(number(v) for v in command['rgb'])+'}')
-                elif kind=='image':
-                    asset=command['asset'];source=Path(resolved.get('asset_files',{}).get(asset,resources/asset))
-                    if not source.is_file():raise FileNotFoundError('Current image asset is missing: '+str(source))
-                    asset='assets/'+Path(asset).stem+source.suffix
-                    destination=out/asset;destination.parent.mkdir(parents=True,exist_ok=True);
-                    if source.resolve()!=destination.resolve():shutil.copyfile(source,destination)
-                    output.append('\\NImage{%s}{%s}{%s}{%s}{%s}'%(asset,number(command['width']),number(command['height']),number(command['x']),number(command['y'])))
-                elif kind=='run':
-                    runid=command['run_id']
-                    if runid not in bindings:raise NeedReflow(f'Missing semantic binding for required run {runid}; original text is unavailable')
-                    slots=supplied_slots(bindings[runid],command);run_count+=1;slot_count+=len(slots);used_runs.append(runid)
-                    chunks=[]
-                    for i,(text,form) in enumerate(slots):
-                        fid,code=resolver.use(command['font'],text,form,runid,i)
-                        if fid is None:continue
-                        if resolver.fonts[fid].record.get('family')=='fallback':fallback_glyphs.append({'page':len(pages)+1,'run_id':runid,'index':i,'text':text,'font':fid,'role':command.get('role'),'user_supplied':resolver.fonts[fid].record.get('user_supplied',False)})
-                        if not chunks or chunks[-1]['font']!=fid:chunks.append({'font':fid,'offsets':[],'codes':[]})
-                        chunks[-1]['offsets'].append(command['offsets'][i]);chunks[-1]['codes'].append(code);drawn+=1
-                    for j,chunk in enumerate(chunks):
-                        contentid=runid+'-c'+str(j+1);characters=''.join('\\NChar{%d}'%code for code in chunk['codes'])
-                        contents.append('\\NDefineText{%s}{%s}'%(contentid,characters))
-                        values=[chunk['font'],number(command['sx']),number(command['sy']),number(command['x']),number(command['y']),','.join(number(x) for x in chunk['offsets']),'\\NGetText{'+contentid+'}']
-                        name='NRun'
-                        if command.get('rotation'):
-                            if command['shear']:raise ValueError('Simultaneous rotation and shear is unsupported')
-                            name='NRunRot';values.insert(0,number(command['rotation']))
-                        elif command['shear']:name='NRunSkew';values.insert(0,number(command['shear']))
-                        output.append('\\'+name+''.join('{'+x+'}' for x in values))
-                else:raise ValueError(f'Unknown calibrated command {kind!r}')
-            pages.append(output)
-    (out/'pages').mkdir(exist_ok=True)
-    for i,p in enumerate(pages,1):(out/'pages'/f'page-{i:03}.tex').write_text('\n'.join(p)+'\n')
-    (out/'content.generated.tex').write_text('% Generated only from supplied semantic slot text. No original-content fallback.\n'+'\n'.join(contents)+'\n')
-    resolver.export(out);shutil.copyfile(resources/'n1-exact.sty',out/'n1-exact.sty')
+    return _RenderInputs(resources,out,layout,resolved,bindings,sections)
+
+def _render_run(command,binding,resolver,page_number,state):
+    runid=command['run_id'];slots=supplied_slots(binding,command)
+    state.run_count+=1;state.slot_count+=len(slots)
+    chunks=[]
+    for i,(text,form) in enumerate(slots):
+        fid,code=resolver.use(command['font'],text,form,runid,i)
+        if fid is None:continue
+        record=resolver.fonts[fid].record
+        if record.get('family')=='fallback':
+            state.fallback_glyphs.append({'page':page_number,'run_id':runid,'index':i,'text':text,'font':fid,'role':command.get('role'),'user_supplied':record.get('user_supplied',False)})
+        if not chunks or chunks[-1]['font']!=fid:chunks.append({'font':fid,'offsets':[],'codes':[]})
+        chunks[-1]['offsets'].append(command['offsets'][i]);chunks[-1]['codes'].append(code);state.drawn+=1
+    output=[]
+    for j,chunk in enumerate(chunks):
+        contentid=runid+'-c'+str(j+1);characters=''.join('\\NChar{%d}'%code for code in chunk['codes'])
+        state.contents.append('\\NDefineText{%s}{%s}'%(contentid,characters))
+        values=[chunk['font'],number(command['sx']),number(command['sy']),number(command['x']),number(command['y']),','.join(number(x) for x in chunk['offsets']),'\\NGetText{'+contentid+'}']
+        name='NRun'
+        if command.get('rotation'):
+            if command['shear']:raise ValueError('Simultaneous rotation and shear is unsupported')
+            name='NRunRot';values.insert(0,number(command['rotation']))
+        elif command['shear']:name='NRunSkew';values.insert(0,number(command['shear']))
+        output.append('\\'+name+''.join('{'+x+'}' for x in values))
+    return output
+
+def _render_page(page,page_number,inputs,resolver,state):
+    output=[]
+    for command in page['commands']:
+        kind=command['type']
+        if kind=='vector':output.append('\\NVector{\n'+command['pdf']+'\n}')
+        elif kind=='ink':output.append('\\NInk{'+','.join(number(v) for v in command['rgb'])+'}')
+        elif kind=='image':
+            asset=command['asset'];source=Path(inputs.resolved.get('asset_files',{}).get(asset,inputs.resources/asset))
+            if not source.is_file():raise FileNotFoundError('Current image asset is missing: '+str(source))
+            asset='assets/'+Path(asset).stem+source.suffix
+            destination=inputs.out/asset;destination.parent.mkdir(parents=True,exist_ok=True)
+            if source.resolve()!=destination.resolve():shutil.copyfile(source,destination)
+            output.append('\\NImage{%s}{%s}{%s}{%s}{%s}'%(asset,number(command['width']),number(command['height']),number(command['x']),number(command['y'])))
+        elif kind=='run':
+            runid=command['run_id']
+            if runid not in inputs.bindings:raise NeedReflow(f'Missing semantic binding for required run {runid}; original text is unavailable')
+            output.extend(_render_run(command,inputs.bindings[runid],resolver,page_number,state))
+        else:raise ValueError(f'Unknown calibrated command {kind!r}')
+    return output
+
+def _render_pages(inputs,resolver):
+    pages=[];state=_RenderState()
+    for section in inputs.sections:
+        for page in inputs.layout['sections'][section]['pages']:
+            pages.append(_render_page(page,len(pages)+1,inputs,resolver,state))
+    return pages,state
+
+def _write_latex_project(inputs,pages,state,resolver):
+    out=inputs.out
+    shutil.rmtree(out/'pages',ignore_errors=True);(out/'pages').mkdir()
+    for i,page in enumerate(pages,1):(out/'pages'/f'page-{i:03}.tex').write_text('\n'.join(page)+'\n')
+    (out/'content.generated.tex').write_text('% Generated only from supplied semantic slot text. No original-content fallback.\n'+'\n'.join(state.contents)+'\n')
+    resolver.export(out);shutil.copyfile(inputs.resources/'n1-exact.sty',out/'n1-exact.sty')
     (out/'main.tex').write_text('\\documentclass{article}\n\\usepackage{n1-exact}\n\\input{content.generated.tex}\n\\begin{document}\n'+''.join('\\NPage{pages/page-%03d.tex}\n'%i for i in range(1,len(pages)+1))+'\\end{document}\n')
     (out/'build.sh').write_text('#!/usr/bin/env bash\nset -euo pipefail\ncd "$(dirname "$0")"\nxelatex -no-pdf -interaction=nonstopmode -halt-on-error main.tex\nxdvipdfmx -o main.pdf main.xdv\n');(out/'build.sh').chmod(0o755)
-    report={'status':'PASS','backend':'component-scene','pages':len(pages),'sections':sections,'resolved_runs':run_count,'resolved_slots':slot_count,'drawn_glyphs':drawn,'font_count':len(resolver.used),'fallback_events':resolver.fallback_events,'unbound_required_runs':[],'content_source':'resolved.runs only','layout_text_fallback':False}
+
+def _compile_project(out,page_count):
+    logs=[]
+    for cmd in [['xelatex','-no-pdf','-interaction=nonstopmode','-halt-on-error','main.tex'],['xdvipdfmx','-o','main.generated.pdf','main.xdv']]:
+        process=subprocess.run(cmd,cwd=out,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True);logs.append('$ '+' '.join(cmd)+'\n'+process.stdout);(out/'compile-output.txt').write_text('\n'.join(logs))
+        if process.returncode or 'Missing character:' in process.stdout:raise RuntimeError('Compilation failed: '+process.stdout[-3500:])
+    pdf=out/'main.generated.pdf'
+    if not pdf.read_bytes().rstrip().endswith(b'%%EOF'):raise RuntimeError('Incomplete generated PDF')
+    with fitz.open(pdf) as document:
+        if document.is_repaired or len(document)!=page_count:raise RuntimeError('PDF page count/xref validation failed')
+    with pdf.open('rb') as stream:os.fsync(stream.fileno())
+    os.replace(pdf,out/'main.pdf');fd=os.open(out,os.O_RDONLY)
+    try:os.fsync(fd)
+    finally:os.close(fd)
+
+def _build_report(inputs,pages,state,resolver,font_policy):
+    report={'status':'PASS','backend':'component-scene','pages':len(pages),'sections':inputs.sections,'resolved_runs':state.run_count,'resolved_slots':state.slot_count,'drawn_glyphs':state.drawn,'font_count':len(resolver.used),'fallback_events':resolver.fallback_events,'unbound_required_runs':[],'content_source':'resolved.runs only','layout_text_fallback':False}
     report['font_policy']=font_policy
-    report['fallback_glyphs']=fallback_glyphs
-    (out/'render-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
-    if args.compile:
-        logs=[]
-        for cmd in [['xelatex','-no-pdf','-interaction=nonstopmode','-halt-on-error','main.tex'],['xdvipdfmx','-o','main.generated.pdf','main.xdv']]:
-            p=subprocess.run(cmd,cwd=out,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True);logs.append('$ '+' '.join(cmd)+'\n'+p.stdout);(out/'compile-output.txt').write_text('\n'.join(logs))
-            if p.returncode or 'Missing character:' in p.stdout:raise RuntimeError('Compilation failed: '+p.stdout[-3500:])
-        pdf=out/'main.generated.pdf'
-        if not pdf.read_bytes().rstrip().endswith(b'%%EOF'):raise RuntimeError('Incomplete generated PDF')
-        with fitz.open(pdf) as d:
-            if d.is_repaired or len(d)!=len(pages):raise RuntimeError('PDF page count/xref validation failed')
-        with pdf.open('rb') as f:os.fsync(f.fileno())
-        os.replace(pdf,out/'main.pdf');fd=os.open(out,os.O_RDONLY)
-        try:os.fsync(fd)
-        finally:os.close(fd)
+    report['fallback_glyphs']=state.fallback_glyphs
+    return report
+
+def render(args):
+    inputs=_load_inputs(args);resolver=Resolver(inputs.resources)
+    from font_overrides import install_overrides
+    font_policy=install_overrides(resolver,getattr(args,'font_config',None),getattr(args,'project_root',None))
+    pages,state=_render_pages(inputs,resolver)
+    _write_latex_project(inputs,pages,state,resolver)
+    report=_build_report(inputs,pages,state,resolver,font_policy)
+    if args.compile:_compile_project(inputs.out,len(pages))
+    (inputs.out/'render-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({k:v for k,v in report.items() if k!='fallback_events'},ensure_ascii=False,indent=2))
 
 def main():

@@ -6,6 +6,8 @@
 4. 运行 `python3 build.py --paper my-exam --booklet written --blueprint blueprints/custom.yaml`，打开生成PDF逐页检查。听力改用 `--booklet listening`。
 5. 确认字体报告。现有 A/B 内容可使用内置字形直接编译。新字超出内置范围时，在 `fonts.yaml` 中配置对应完整版，并查看 `render-report.json` 确认字体；本版不注册通用替代字体，最终缺字会报错。`--fonts other-fonts.yaml` 可指定自己的同名字体路径。
 
+若要在封面显示年份场次和题册符号，在当前元数据的 `booklets.written` 或 `booklets.listening` 下填写 `session_label: "（２０２３－２）"` 和 `form_symbol: A`。两项均可选，省略、设为 `null` 或空字符串时完全不绘制；字段格式见 `SCHEMA.md`，对应字体路径见 `FONTS.md`。
+
 普通四选一用 `kind: choice`；排序题用 `word_order`。共用文章及其问题用 `reading` 或 `cloze`；听力用 `listening_choice`、`listening_compound`、`listening_memo`。格式和所有主要参数见 `SCHEMA.md`。
 
 ## 行内格式

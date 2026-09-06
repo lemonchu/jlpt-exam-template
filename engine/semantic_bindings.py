@@ -1,21 +1,35 @@
-"""Resolve a calibrated layout from the current semantic YAML content only."""
-from pathlib import Path
-import json,re,unicodedata
-import yaml
+"""Validate semantic content against calibrated component contracts."""
+import hashlib,json,re,unicodedata
 from inline import parse
 
 class CalibrationMismatch(ValueError):pass
 
+def binding_text(text):
+    """Expand hanging-note markup to the equivalent visible character order.
+
+    Measured profiles bind every visible character, including the small note
+    label. Composition keeps that label as annotation metadata, while binding
+    compares it with the source spelling ``base（注）``.
+    """
+    text=str(text);out=[];i=0
+    while i<len(text):
+        if text.startswith('{{',i):
+            end=text.find('}}',i+2)
+            if end<0 or '|' not in text[i+2:end]:raise ValueError('Invalid note anchor')
+            label,inner=text[i+2:end].split('|',1)
+            out.append(binding_text(inner));out.append(('（'+label+'）') if label.startswith('注') else label)
+            i=end+2;continue
+        out.append(text[i]);i+=1
+    return ''.join(out)
+
 def shape(text):
-    atoms=parse(str(text));base=''.join(a.text for a in atoms);ruby=[];styles=[];offset=0
+    atoms=parse(binding_text(text));base=''.join(a.text for a in atoms);ruby=[];styles=[];offset=0
     for a in atoms:
         n=sum(not c.isspace() for c in a.text)
         if a.ruby:ruby.append([offset,n,len(''.join(c for c in a.ruby if not c.isspace()))])
         if a.underline or a.bold:styles.append([offset,n,a.underline,a.bold])
         offset+=n
-    result={'base_count':offset,'ruby':ruby,'styles':styles,'whitespace':[[m.start(),m.group()] for m in re.finditer(r'\s+',base)],'vector_marks':[[i,c] for i,c in enumerate(base) if c in '〔〕―-']}
-    if any(a.annotation for a in atoms):result['annotations']=[a.annotation for a in atoms]
-    return result
+    return {'base_count':offset,'ruby':ruby,'styles':styles,'whitespace':[[m.start(),m.group()] for m in re.finditer(r'\s+',base)],'vector_marks':[[i,c] for i,c in enumerate(base) if c in '〔〕―-']}
 
 def skeleton(v):
     keys={'groups','items','questions','stimulus','blocks','options','rows','title','instruction','prompt','text','label','asset','type','kind','is_example'}
@@ -23,8 +37,64 @@ def skeleton(v):
     if isinstance(v,list):return [skeleton(c) for c in v]
     return type(v).__name__
 
+def iter_questions(value):
+    """Yield every non-example object that owns answer options."""
+    if isinstance(value,dict):
+        if 'options' in value and not value.get('is_example',False):yield value
+        for key,child in value.items():
+            if key!='options':yield from iter_questions(child)
+    elif isinstance(value,list):
+        for child in value:yield from iter_questions(child)
+
+def inline_layout_signature(text):
+    """Coarse text presence plus inline annotations that alter composition.
+
+    Exact glyph capacity remains the responsibility of ``resolve_runs``. This
+    signature only closes gaps that have no measured run, notably empty table
+    cells, while still allowing same-shape replacement text.
+    """
+    if not isinstance(text,str):return {'value_type':type(text).__name__}
+    text_shape=shape(text);annotations=[];offset=0
+    for atom in parse(text):
+        count=sum(not c.isspace() for c in atom.text)
+        if atom.annotation:annotations.append([offset,atom.annotation_span,shape(atom.annotation)])
+        offset+=count
+    presence='empty' if text=='' else 'whitespace' if text.isspace() else 'text'
+    result={'value_type':'str','presence':presence,'annotations':annotations}
+    # Whitespace-only underlined slots have no glyph run for resolve_runs to
+    # inspect, so their exact blank/underline geometry belongs in the contract.
+    if text_shape['base_count']==0:result['glyphless_shape']=text_shape
+    return result
+
+def layout_signature(v,semantic_values=False):
+    """Describe content-side layout choices without including visible text.
+
+    Measured components may substitute different text when its semantic shape
+    still fits. They must not hide an editor's explicit alignment, style,
+    table, image, or other layout change. Unknown non-semantic fields are kept
+    deliberately, so new rendering options fail closed until calibrated.
+    """
+    ignored={'id','source_number','source_pages'}
+    semantic={'title','instruction','prompt','text','label'}
+    if isinstance(v,dict):
+        result={}
+        for key,value in v.items():
+            if key in ignored:continue
+            if key in semantic:result[key]=inline_layout_signature(value)
+            elif key=='alt':continue
+            elif key in ('options','rows'):result[key]=layout_signature(value,True)
+            else:result[key]=layout_signature(value)
+        return result
+    if isinstance(v,list):return [layout_signature(value,semantic_values) for value in v]
+    return inline_layout_signature(v) if semantic_values else v
+
+def layout_fingerprint(v):
+    payload=json.dumps(layout_signature(v),ensure_ascii=False,sort_keys=True,separators=(',',':'))
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
 def pointer(data,path):
     value=data
+    if path=='':return value
     for segment in path.strip('/').split('/'):
         segment=segment.replace('~1','/').replace('~0','~')
         value=value[int(segment)] if isinstance(value,list) else value[segment]
@@ -40,45 +110,6 @@ def field_value(f,data):
     return str(pointer(data,f['pointer']))
 
 def chars_for(value,role):
-    return [c for a in parse(value) for c in (a.ruby if role=='ruby' else a.text) if not c.isspace()]
+    return [c for a in parse(binding_text(value)) for c in (a.ruby if role=='ruby' else a.text) if not c.isspace()]
 
 def normal(s):return ''.join(c for c in unicodedata.normalize('NFKC',s) if not c.isspace())
-
-def resolve(content_dir,binding_file,sections):
-    content_dir=Path(content_dir);bindings=json.loads(Path(binding_file).read_text());data={};values={};reasons=[]
-    for sec in sections:
-        try:data[sec+'.yaml']=yaml.safe_load((content_dir/(sec+'.yaml')).read_text())
-        except (FileNotFoundError,ValueError) as e:raise CalibrationMismatch(str(e)) from e
-        expected=bindings.get('skeletons',{}).get(sec)
-        if expected is not None and skeleton(data[sec+'.yaml'])!=expected:reasons.append(sec+': question/block structure changed')
-    for fid,f in bindings['fields'].items():
-        if fid[0] not in sections:continue
-        try:value=field_value(f,data[f['file']])
-        except (KeyError,IndexError,TypeError) as e:
-            reasons.append(fid+': field is absent or changed type');continue
-        if shape(value)!=f['shape']:reasons.append(fid+': text length, ruby, underline, whitespace or vector-mark geometry changed')
-        values[fid]=chars_for(value,f['role'])
-    if reasons:raise CalibrationMismatch('; '.join(reasons[:8])+(f'; {len(reasons)} differences in total' if len(reasons)>8 else ''))
-    runs={};ledger=[]
-    for runid,run in bindings['runs'].items():
-        if runid[0] not in sections:continue
-        glyphs=[]
-        for i,g in enumerate(run['glyphs']):
-            refs=g['refs'];formatter=g['formatter'];raw=[values[r['field']][r['char']] for r in refs]
-            if formatter=='identity':text=raw[0]
-            elif formatter=='ascii':text=normal(raw[0])
-            elif formatter=='fullwidth':
-                n=normal(raw[0]);text=''.join(chr(ord(c)+0xFEE0) if '!'<=c<='~' else c for c in n)
-            elif formatter=='circled':
-                n=normal(raw[0]);text=chr(0x2460+int(n)-1) if n.isdigit() and 1<=int(n)<=9 else raw[0]
-            elif formatter=='ring':
-                if raw[0] not in '①②③④⑤⑥⑦⑧⑨':raise CalibrationMismatch('Circled-answer demonstration changed symbol class')
-                text='○'
-            elif formatter=='combined':
-                text=''.join(normal(c)[r['part']] for c,r in zip(raw,refs))
-                if text!='()':raise CalibrationMismatch('Combined parenthesis component changed delimiter class')
-                text='( )'
-            else:raise ValueError('Unknown semantic formatter '+formatter)
-            glyphs.append(text);ledger.append({'run':runid,'index':i,'refs':refs,'text':text})
-        runs[runid]={'glyphs':glyphs}
-    return {'schema_version':1,'runs':runs},ledger

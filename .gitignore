@@ -18,6 +18,7 @@ resources/user-fonts/
 private/
 input-pdfs/
 output/
+tmp/
 dist/
 __pycache__/
 *.py[cod]

@@ -11,16 +11,16 @@ import hashlib
 import json
 import re
 
-import yaml
 from fontTools.ttLib import TTFont
 from fontTools.pens.boundsPen import BoundsPen
-from metadata_bindings import (format_field, pointer_get, variable_value,
-                               resolve as resolve_measured)
+from metadata_bindings import (format_field, format_pointer_template,
+                               load_metadata, resolve_loaded)
 from font_overrides import font_role
 
 MIN_SCALE = .75
 CLOSE = '、。，．・：；？！ー〜～）)]｝}」』】〉》〕'
 OPEN = '（([｛{「『【〈《〔'
+SUBJECT_KINDS = ('subject_ja', 'subject_en')
 
 
 class MetadataCapacityError(ValueError):
@@ -70,7 +70,7 @@ def _regions(layout, bindings):
 
 
 def _raw_field(field, metadata):
-    spec = copy.deepcopy(field)
+    spec = dict(field)
     spec['formatter'] = [t for t in spec.get('formatter', []) if t['op'] != 'strip_whitespace']
     return ''.join(format_field(spec, metadata))
 
@@ -78,13 +78,23 @@ def _raw_field(field, metadata):
 def _prefix(field, metadata):
     for transform in field.get('formatter', []):
         if transform['op'] == 'prepend':
-            variables = {k: variable_value(v, metadata) for k, v in transform.get('variables', {}).items()}
-            return str(pointer_get(metadata, transform['pointer'])).format(**variables)
+            return format_pointer_template(transform, metadata)
     return ''
 
 
 def _style_key(command):
     return command['font'], command['sx'], command['sy'], command.get('shear', 0)
+
+
+def _parenthetical_characters(text):
+    """Yield characters with the parenthetical style state used on covers."""
+    depth = 0
+    for char in text:
+        if char in '（(':
+            depth += 1
+        yield char, bool(depth)
+        if char in '）)' and depth:
+            depth -= 1
 
 
 class _Metrics:
@@ -192,7 +202,7 @@ def _clip_decorations(command, boxes, paper):
     return result
 
 
-def _styles(rows, metrics, kind, rectangles=()):
+def _styles(rows, metrics, kind, attached_boxes=()):
     counts = Counter()
     examples = {}
     for _, command, record in rows:
@@ -200,7 +210,7 @@ def _styles(rows, metrics, kind, rectangles=()):
         counts[key] += len(record['glyphs'])
         examples[key] = command
     candidates = [key for key in counts if metrics.resolver.fonts[key[0]].record['family'] != 'custom'] or list(counts)
-    if kind in ('subject_ja', 'subject_en'):
+    if kind in SUBJECT_KINDS:
         main = max(candidates, key=lambda k: (k[2], counts[k]))
     elif kind == 'duration':
         regular = [k for k in candidates if not any(n in metrics.resolver.fonts[k[0]].record.get('name', '').lower() for n in ('helvetica', 'gothicmb'))]
@@ -214,10 +224,10 @@ def _styles(rows, metrics, kind, rectangles=()):
     for key, command in examples.items():
         baseline = min(baselines, key=lambda y: abs(y - command['y']))
         styles[key] = {'font': key[0], 'sx': key[1], 'sy': key[2], 'shear': key[3], 'dy': command['y'] - baseline}
-    for command, (left,bottom,right,top) in _attached_boxes(rows, metrics, rectangles):
+    for command, (left,bottom,right,top) in attached_boxes:
         key = _style_key(command)
         styles[key].setdefault('box', {'dx': left-command['x'], 'dy': bottom-command['y'], 'width': right-left, 'height': top-bottom, 'line_width': .33})
-    small = min(styles, key=lambda k: k[2]) if kind in ('subject_ja', 'subject_en') else main
+    small = min(styles, key=lambda k: k[2]) if kind in SUBJECT_KINDS else main
     custom = next((key for key in styles if metrics.resolver.fonts[key[0]].record['family'] == 'custom'), None)
     digits = None
     if kind == 'duration':
@@ -229,15 +239,8 @@ def _capacity_reason(field_name, rows, chars, metrics):
     """Equal character count is insufficient for proportional text or style spans."""
     kind = _kind(field_name)
     styles, main, small, _, _, baselines = _styles(rows, metrics, kind)
-    if kind in ('subject_ja', 'subject_en') and main != small:
-        expected_small = []
-        depth = 0
-        for char in chars:
-            if char in '（(':
-                depth += 1
-            expected_small.append(bool(depth))
-            if char in '）)' and depth:
-                depth -= 1
+    if kind in SUBJECT_KINDS and main != small:
+        expected_small = [inside for _, inside in _parenthetical_characters(chars)]
         for _, command, record in rows:
             is_small = abs(command['sy'] - styles[small]['sy']) < .01
             for glyph in record['glyphs']:
@@ -271,12 +274,9 @@ def _capacity_reason(field_name, rows, chars, metrics):
 
 def _chars(text, styles, main, small, custom, digits, kind, metrics):
     result = []
-    depth = 0
-    for char in text:
-        if char in '（(':
-            depth += 1
+    for char, inside_parentheses in _parenthetical_characters(text):
         key = main
-        if kind in ('subject_ja', 'subject_en') and depth:
+        if kind in SUBJECT_KINDS and inside_parentheses:
             key = small
         elif kind == 'duration' and char.isdigit() and digits is not None:
             key = digits
@@ -289,8 +289,6 @@ def _chars(text, styles, main, small, custom, digits, kind, metrics):
             item['width'] = style['box']['width'] + 2*margin
             item['glyph_shift'] = margin - style['box']['dx']
         result.append(item)
-        if char in '）)' and depth:
-            depth -= 1
     return result
 
 
@@ -387,9 +385,9 @@ def _emit(chars, x, baseline, scale, stem, counter):
     return commands, resolved, cursor
 
 
-def _reflow(field_name, field, rows, metadata, metrics, regions, page_width, rectangles):
+def _reflow(field_name, field, rows, metadata, metrics, regions, page_width, attached_boxes):
     kind = _kind(field_name)
-    styles, main, small, custom, digits, baselines = _styles(rows, metrics, kind, rectangles)
+    styles, main, small, custom, digits, baselines = _styles(rows, metrics, kind, attached_boxes)
     text = _raw_field(field, metadata)
     prefix = _prefix(field, metadata) if kind == 'notice.ja' else ''
     if prefix and not text.startswith(prefix):
@@ -417,12 +415,12 @@ def _reflow(field_name, field, rows, metadata, metrics, regions, page_width, rec
     for _, command, record in rows:
         for index, glyph in enumerate(record['glyphs']):
             for char_index in glyph['char_indices']:
-                positions[char_index] = (command['x'] + command['offsets'][index] * command['sx'] / command['sy'], command['y'])
+                positions[char_index] = command['x'] + command['offsets'][index] * command['sx'] / command['sy']
     compact_prefix = ''.join(prefix.split())
     if compact_prefix:
         original_prefix_length = 2  # number + punctuation, declared by notice_prefix's formatter
         # Prefer the geometric first-body anchor; no original body text is read.
-        lefts[0] = positions.get(original_prefix_length, (low + styles[main]['sx'] * 2.25, baselines[0]))[0]
+        lefts[0] = positions.get(original_prefix_length, low + styles[main]['sx'] * 2.25)
     chars = _chars(content, styles, main, small, custom, digits, kind, metrics)
     widths = [high - x for x in lefts]
     chosen = None
@@ -446,7 +444,7 @@ def _reflow(field_name, field, rows, metadata, metrics, regions, page_width, rec
         # Retain native prefix anchors when their standard two-character shape remains.
         if len(prefix_chars) == 2 and all(i in positions for i in (0, 1)):
             for i, char in enumerate(prefix_chars):
-                cc, rr, _ = _emit([char], positions[i][0], baselines[0], scale, stem, counter)
+                cc, rr, _ = _emit([char], positions[i], baselines[0], scale, stem, counter)
                 commands.extend(cc); resolved.update(rr)
         else:
             cc, rr, end = _emit(prefix_chars, low, baselines[0], scale, stem, counter)
@@ -483,25 +481,15 @@ def resolve_metadata_components(profile, metadata_path, commands, fonts, body_pa
     metadata_path = Path(metadata_path)
     bindings_path = profile / 'metadata-bindings.json'
     bindings = json.loads(bindings_path.read_text())
-    layout = json.loads((profile / 'layout.json').read_text())
-    metadata = yaml.safe_load(metadata_path.read_text())
-    for category, entries in bindings.get('page_plan', {}).items():
-        for key, value in entries.items():
-            metadata.setdefault(category, {}).setdefault(key, {}).update(value)
-    if body_pages is not None:
-        if isinstance(body_pages, bool) or not isinstance(body_pages, int) or body_pages < 0:
-            raise ValueError('body_pages must be a nonnegative integer')
-        metadata['_body_pages'] = body_pages
+    metadata = load_metadata(metadata_path, bindings, body_pages)
     by_field = _field_runs(commands, bindings)
     for booklet in ('written', 'listening'):
-        active_notices = [name for name in by_field if name.startswith(booklet + '.notice.')]
-        if active_notices:
+        if any(name.startswith(booklet + '.notice.') for name in by_field):
             expected_indices = {int(name.split('.')[2]) for name in bindings['fields'] if name.startswith(booklet + '.notice.')}
             supplied = metadata['booklets'][booklet]['notices']
             if not isinstance(supplied, list) or len(supplied) != len(expected_indices):
                 raise MetadataCapacityError(f'The {booklet} cover defines {len(expected_indices)} notice blocks; change their text, or provide a different cover layout to change the block count')
-    changed = {}
-    reasons = {}
+    changes = []
     metrics = _Metrics(fonts)
     for field_name in by_field:
         field = bindings['fields'][field_name]
@@ -509,32 +497,35 @@ def resolve_metadata_components(profile, metadata_path, commands, fonts, body_pa
         expected = field.get('glyph_slots')
         reason = 'character-count-changed' if expected is not None and len(chars) != expected else _capacity_reason(field_name, by_field[field_name], chars, metrics)
         if reason:
-            changed[field_name] = len(chars)
-            reasons[field_name] = reason
-    untouched_ids = [command['run_id'] for field, rows in by_field.items() if field not in changed for _, command, _ in rows]
-    resolved = resolve_measured(metadata_path, bindings_path, body_pages=body_pages, run_ids=untouched_ids)['runs']
+            changes.append((field_name, reason))
+    changed_fields = {field_name for field_name, _ in changes}
+    untouched_ids = [command['run_id'] for field, rows in by_field.items() if field not in changed_fields for _, command, _ in rows]
+    resolved = resolve_loaded(metadata, bindings, metadata_path.name, run_ids=untouched_ids)['runs']
     output = []
     replacements = {}
     remove = set()
     audits = []
-    regions = _regions(layout, bindings) if changed else {}
-    rectangles = _rectangles(commands) if changed else []
+    layout = json.loads((profile / 'layout.json').read_text()) if changes else None
+    regions = _regions(layout, bindings) if changes else {}
+    rectangles = _rectangles(commands) if changes else []
     removed_boxes = []
-    for field_name in changed:
+    for field_name, reason in changes:
         rows = by_field[field_name]
-        cc, rr, aa = _reflow(field_name, bindings['fields'][field_name], rows, metadata, metrics, regions, layout['paper']['width'], rectangles)
-        removed_boxes.extend(box for _, box in _attached_boxes(rows, metrics, rectangles))
+        attached_boxes = _attached_boxes(rows, metrics, rectangles)
+        cc, rr, aa = _reflow(field_name, bindings['fields'][field_name], rows, metadata, metrics, regions, layout['paper']['width'], attached_boxes)
+        removed_boxes.extend(box for _, box in attached_boxes)
         replacements[rows[0][0]] = cc
         remove.update(index for index, _, _ in rows)
         resolved.update(rr)
-        aa['reason'] = reasons[field_name]
+        aa['reason'] = reason
         audits.append(aa)
+    paper = layout['paper'] if layout is not None else None
     for index, command in enumerate(commands):
         if index in replacements:
             output.extend(replacements[index])
         if index not in remove:
-            output.append(_clip_decorations(copy.deepcopy(command), removed_boxes, layout['paper']))
-    audit = {'schema_version': 1, 'unchanged_fields': sorted(set(by_field) - set(changed)),
+            output.append(_clip_decorations(command, removed_boxes, paper))
+    audit = {'schema_version': 1, 'unchanged_fields': sorted(set(by_field) - changed_fields),
              'changed_fields': audits, 'body_pages': body_pages, 'source_text_used': False,
              'original_run_count': sum(len(rows) for rows in by_field.values()),
              'resolved_run_count': len(resolved), 'removed_inline_box_rectangles': removed_boxes}

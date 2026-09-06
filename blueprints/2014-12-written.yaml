@@ -35,6 +35,8 @@ groups:
     - 0.11
     - 0.295
 - id: G7
+  body_start_adjust: -9.93
+  material_intro_line_height: 19.8
   material_box_top_padding: 8
   material_box_bottom_padding: 0
 - id: R8
@@ -50,17 +52,23 @@ groups:
 - id: R12
   options_columns: 1
 - id: R13
-  options_columns: 1
+  options_columns: auto
   layout: facing_pages
   reference_font_size: 8.8
   reference_line_height: 13.0
+  reference_outset: 16.95
+  table_font_size: 8.0
+  table_line_height: 10.0
+  table_cell_padding_x: 2.5
+  table_cell_padding_top: 3.5
+  table_cell_padding_bottom: 3.5
   table_column_widths:
     5:
     - 0.045
-    - 0.16
-    - 0.06
-    - 0.23
-    - 0.505
+    - 0.135
+    - 0.045
+    - 0.175
+    - 0.6
     3:
     - 0.3
     - 0.35
