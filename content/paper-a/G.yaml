@@ -88,6 +88,7 @@ groups:
             blocks:
               - type: table
                 header_rows: 0
+                borders: false
                 rows:
                   - [あそこで, __　　　__, __　　　__, __★__, __　　　__, は｜山田《やまだ》さんです。]
                   - ['', １　テレビ, ３　を, ２　見ている, ４　人, '']
@@ -98,6 +99,9 @@ groups:
             text: （解答用紙）
           - type: table
             header_rows: 0
+            width: 135
+            align: center
+            column_widths: [0.35, 0.65]
             rows:
               - [（例）, ①　●　③　④]
       - id: G36

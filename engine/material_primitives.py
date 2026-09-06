@@ -101,7 +101,9 @@ class MaterialPrimitives:
         if t=='memo':return min(float(b.get('height',260)),self.usable)
         if t=='image':
             _,w,h=self.image_geometry(b,width);return min(h,self.usable)+4
-        if t=='table':return sum(self.table_rows(b,width)[1])+6
+        if t=='table':
+            _,table_width=self.table_geometry(b,0,width)
+            return sum(self.table_rows(b,table_width)[1])+6
         if t=='vertical':return min(float(b.get('column_height',self.gc.get('vertical_column_height',280))),self.usable)+18
         if t=='separator':return 16
         raise ValueError(f'Unknown stimulus block type {t!r}')
@@ -159,12 +161,27 @@ class MaterialPrimitives:
             prepared.append(cells);heights.append(max(len(c) for c in cells)*lead+10)
         return (widths,heights,prepared,size,lead)
 
+    def table_geometry(self,b,x,width):
+        configured=b.get('width',width)
+        if isinstance(configured,bool):raise ValueError('Table width must be a positive number')
+        try:table_width=float(configured)
+        except (TypeError,ValueError) as e:raise ValueError('Table width must be a positive number') from e
+        if table_width<=0 or table_width>width+1e-6:raise ValueError('Table width must fit within the available space')
+        align=b.get('align','left')
+        if align not in ('left','center','right'):raise ValueError('Table align must be left, center, or right')
+        offset=0 if align=='left' else (width-table_width)/2 if align=='center' else width-table_width
+        return x+offset,table_width
+
     def table(self,b,x,width):
+        x,width=self.table_geometry(b,x,width)
+        borders=b.get('borders',True)
+        if not isinstance(borders,bool):raise ValueError('Table borders must be true or false')
         widths,heights,prepared,size,lead=self.table_rows(b,width);headers=int(b.get('header_rows',0))
         def drawrow(i):
             h=heights[i];self.ensure(h);xx=x
             for ls,w in zip(prepared[i],widths):
-                self.rect(xx,self.y,w,h,fill='.94 .94 .94' if i<headers else None)
+                fill='.94 .94 .94' if i<headers else None
+                if fill or borders:self.rect(xx,self.y,w,h,fill=fill,stroke=borders)
                 for j,ln in enumerate(ls):self.line(ln,xx+5,self.y+4+j*lead,size)
                 xx+=w
             self.y+=h

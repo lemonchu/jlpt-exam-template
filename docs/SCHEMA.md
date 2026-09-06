@@ -94,7 +94,7 @@ groups:
 | `heading` | `text`，作为材料标题 |
 | `vertical` | `text`，按语义阅读顺序填写的纵排文章 |
 | `box` | `blocks`，框内递归材料列表 |
-| `table` | `rows` 为二维字符串列表，每行列数相同；`header_rows` 为表头行数，默认 0 |
+| `table` | `rows` 为二维字符串列表，每行列数相同；`header_rows` 为表头行数，默认 0；可用 `borders: false` 隐藏单元格线，以 `width` 和 `align: left\|center\|right` 控制表格宽度与对齐 |
 | `image` | `asset` 为 `assets/` 下的相对文件路径；`alt` 为说明或转录，不打印 |
 | `memo` | 可选 `label`，默认 `－メモ－`；可选 `height` 为该空白书写区固有高度，单位 bp |
 | `separator` | 两部分材料之间的空白间隔 |

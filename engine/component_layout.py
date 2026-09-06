@@ -2,7 +2,8 @@
 from pathlib import Path
 from dataclasses import replace
 import re,copy,json
-from inline import lines,parse,plain,measure,OPEN,CLOSE
+from inline import (lines,parse,plain,measure,OPEN,CLOSE,REFERENCE_BOX_WIDTH,
+                    REFERENCE_BOX_SUFFIX_WIDTH,REFERENCE_BOX_MARGIN)
 from material_primitives import MaterialPrimitives
 from semantic_bindings import CalibrationMismatch
 from page_furniture import decorate
@@ -57,9 +58,12 @@ class ComponentLayout(MaterialPrimitives):
             reference=re.fullmatch(r'〔([0-9]+)(-[A-Za-z])?〕',a.text)
             if reference:
                 scale=size/11.3;label=reference[1]+(reference[2] or '')
-                self.rect(x,baseline-12.655*scale,a.width,16.742*scale)
+                frame_width=(REFERENCE_BOX_WIDTH+(REFERENCE_BOX_SUFFIX_WIDTH if reference[2] else 0))*scale
+                margin=REFERENCE_BOX_MARGIN*scale
+                frame_x=x+margin
+                self.rect(frame_x,baseline-12.655*scale,frame_width,16.742*scale)
                 label_width=(len(reference[1])*5.070304+(len(reference[2] or '')*4.6))*scale
-                xx=x+(a.width-label_width)/2
+                xx=frame_x+(frame_width-label_width)/2
                 for ch in label:
                     self.glyph(ch,9.2*scale,xx,baseline-.798*scale,role='question-number' if ch.isdigit() else 'body',hscale=.8 if ch.isdigit() else 1)
                     xx+=(5.070304 if ch.isdigit() else 4.6)*scale
@@ -189,7 +193,7 @@ class ComponentLayout(MaterialPrimitives):
         ab=b.get('_reading_ab',False)
         if self.section=='G' and self.group and self.group.get('kind')=='cloze':
             padding=float(self.gc.get('material_box_padding',11.31))
-            return padding,float(self.gc.get('material_box_top_padding',24.153)),float(self.gc.get('material_box_bottom_padding',9.117)),5.105
+            return padding,float(self.gc.get('material_box_top_padding',19.8)),float(self.gc.get('material_box_bottom_padding',9.117)),5.105
         inset=5.64 if ab else 8.0
         top=10.702 if ab else 8.0
         children=b.get('blocks',[])
