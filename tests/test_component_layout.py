@@ -64,6 +64,15 @@ class ChoiceLayoutTests(unittest.TestCase):
         layout.line([Atom('abc',width=15)],0,0,10)
         self.assertEqual([call[0] for call in layout.catalog.width_calls],list('abc'))
 
+    def test_ordering_star_ignores_padding_inside_underline(self):
+        layout=object.__new__(ComponentLayout)
+        layout.catalog=CountingCatalog();layout.section='G'
+        for source in ('__★__','__ ★ __','__　★　__'):
+            with self.subTest(source=source):
+                atoms=layout.ordering_atoms(source,10)
+                self.assertEqual([(atom.text,atom.underline) for atom in atoms],[('★',True)])
+                self.assertAlmostEqual(atoms[0].width,30)
+
 
 if __name__=='__main__':
     unittest.main()

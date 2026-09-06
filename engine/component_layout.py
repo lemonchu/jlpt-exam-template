@@ -154,6 +154,9 @@ class ComponentLayout(MaterialPrimitives):
             previous_flexible=flexible
     def ordering_atoms(self,text,size,bold=False):
         """Normalize only whitespace outside, and adjacent to, ordering slots."""
+        # A starred slot is intrinsically three em wide.  Padding it inside the
+        # underline would create adjacent rules and can split the slot in two.
+        text=re.sub(r'__[ \u3000]*★[ \u3000]*__','__★__',text)
         source=parse(text,bold);normalized=[];i=0
         while i<len(source):
             atom=source[i]

@@ -44,7 +44,7 @@ PDF 输出到 `output/N1-paper-a-written.pdf`。将 `paper-a` 改为 `paper-b` �
 
 构建时会自动选择版式：文字容量、行内标记、内容布局属性和页面配置都与校准组件兼容时，复用其精确位置；任一条件不兼容时，该题组自动改用规则排版。`--recompose` 可强制全卷仅用规则排版，适合检查自定义内容的流式分页；它追求同一视觉规范，但不保证与参考 PDF 逐坐标一致。
 
-修改构建引擎后，可运行 `python3 -m unittest discover -s tests` 执行全套单元测试（目前 60 项）。重新生成 A 的文字卷和听力卷后，运行 `python3 tests/verify_examples.py` 可逐页核对这两份示例的渲染像素。
+修改构建引擎后，可运行 `python3 -m unittest discover -s tests` 执行全套单元测试（目前 61 项）。重新生成 A 的文字卷和听力卷后，运行 `python3 tests/verify_examples.py` 可逐页核对这两份示例的渲染像素。
 
 ## 许可
 
