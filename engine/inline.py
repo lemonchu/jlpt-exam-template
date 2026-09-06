@@ -13,6 +13,12 @@ class Atom:
 
 OPEN='（([｛{「『【〈《〔'
 CLOSE='、。，．・：；？！ー〜～）)]｝}」』】〉》〕ァィゥェォッャュョぁぃぅぇぉっゃゅょ々'
+# A's measured cloze frames use half-em side spacing, compressed before closing punctuation.
+REFERENCE_BOX_WIDTH=33.75
+REFERENCE_BOX_SUFFIX_WIDTH=11.31
+REFERENCE_BOX_MARGIN=5.655
+REFERENCE_BOX_CLOSING_MARGIN=2.655
+REFERENCE_BOX_CLOSING='、。，．・：；？！）)]｝}」』】〉》'
 
 def parse(text,bold=False,underline=False):
     """Markup is deliberately small; malformed paired markup is an error."""
@@ -52,8 +58,15 @@ def measure(atoms,catalog,size,section=''):
         ruby=sum(catalog.width(c,size*.5,a.bold,section) for c in a.ruby)
         if a.underline and a.text=='★':base=max(base,size*3)
         ref=re.fullmatch(r'〔([0-9]+)(-[A-Za-z])?〕',a.text)
-        if ref and getattr(catalog,'compress_ruby',False):base=(33.75+(11.31 if ref[2] else 0))*size/11.3
+        if ref and getattr(catalog,'compress_ruby',False):
+            frame=REFERENCE_BOX_WIDTH+(REFERENCE_BOX_SUFFIX_WIDTH if ref[2] else 0)
+            base=(frame+2*REFERENCE_BOX_MARGIN)*size/11.3
         result.append(replace(a,width=base if getattr(catalog,"compress_ruby",False) else max(base,ruby)))
+    if getattr(catalog,'compress_ruby',False):
+        reduction=(REFERENCE_BOX_MARGIN-REFERENCE_BOX_CLOSING_MARGIN)*size/11.3
+        for i in range(len(result)-1):
+            if re.fullmatch(r'〔[0-9]+(?:-[A-Za-z])?〕',result[i].text) and result[i+1].text[:1] in REFERENCE_BOX_CLOSING:
+                result[i]=replace(result[i],width=result[i].width-reduction)
     return result
 
 def lines(text,catalog,size,width,section='',bold=False):
