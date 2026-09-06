@@ -15,10 +15,10 @@
 
 ```sh
 python build.py --paper paper-2014-12 --booklet written --blueprint blueprints/2014-12-written.yaml
-python build.py --paper paper-2014-12 --booklet listening --blueprint blueprints/2014-12-listening.yaml
+python build.py --paper paper-2014-12 --booklet listening
 ```
 
-这套题含有内置子集未覆盖的字符。构建前请按 `docs/FONTS.md` 在根目录 `fonts.yaml` 配置 Ryumin 和 FutoGo B101 完整字体；字体无需安装到系统，也不会提交到 Git。
+这套题含有内置子集未覆盖的字符，并启用了封面年份与 A/B 标号。构建前请按 `docs/FONTS.md` 在根目录 `fonts.yaml` 配置 Ryumin、FutoGo B101、Gothic MB101 Pro R 和 New Century Schoolbook Roman（或 C059 Roman）；字体无需安装到系统，也不会提交到 Git。
 
 ## 排版与校对范围
 

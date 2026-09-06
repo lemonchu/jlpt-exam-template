@@ -90,11 +90,11 @@ groups:
 
 | `type` | 内容字段与含义 |
 | --- | --- |
-| `paragraph` | `text`；可选 `style: bold\|small`、`align: left\|center\|right` |
+| `paragraph` | `text`；可选 `style: bold\|small`、`align: left\|center\|right`、非负数 `indent` |
 | `heading` | `text`，作为材料标题 |
 | `vertical` | `text`，按语义阅读顺序填写的纵排文章 |
 | `box` | `blocks`，框内递归材料列表 |
-| `table` | `rows` 为二维字符串列表，每行列数相同；`header_rows` 为表头行数，默认 0；可用 `borders: false` 隐藏单元格线，以 `width` 和 `align: left\|center\|right` 控制表格宽度与对齐 |
+| `table` | `rows` 为二维字符串列表，每行列数相同；`header_rows` 为表头行数，默认 0；可用 `borders: false` 隐藏单元格线，以 `width` 和 `align: left\|center\|right` 控制表格宽度与对齐；`column_alignments` 可逐列设置对齐，表头另可用 `header_bold`、`header_fill`、`header_alignments` |
 | `image` | `asset` 为 `assets/` 下的相对文件路径；`alt` 为说明或转录，不打印 |
 | `memo` | 可选 `label`，默认 `－メモ－`；可选 `height` 为该空白书写区固有高度，单位 bp |
 | `separator` | 两部分材料之间的空白间隔 |
@@ -126,15 +126,19 @@ groups:
 
 `groups` 决定采用顺序；`items` 省略表示全组，指定时只接受该组直接条目的 ID，关联追问不能越过篇章单独选入。`title` 可覆盖题组显示标题。编号模式为 `continuous`、`source`、`per_group`。
 
+当前校准渲染器固定使用 A4 的 `595 × 842 bp` 页面；`page.width` 和 `page.height` 用于明确该约束，不能改成其他纸张尺寸。页边距、版心、字号和行距仍可由蓝图调整。
+
 `components_file` 相对于蓝图目录，内容形如 `components: {reading: {options_columns: 1}}`；`group_defaults` 提供共用设置，显式组配置优先。相关题组的布局参数变化后，该题组重新排版；仅改变题组顺序时，可移动原组件并重新绘制页边装饰。
 
-其他常用字段包括 `cover`、`header`、`sidebar`、`table_column_widths` 和 `layout: facing_pages`，可参考仓库内的现有蓝图。侧边分区位置支持 `outer|inner|left|right`；`sidebar: false` 关闭。单个选项列数只支持 `auto`、1、2、4。
+其他常用字段包括 `cover`、`header`、`sidebar`、`table_column_widths` 和 `layout: facing_pages`，可参考仓库内的现有蓝图。侧边分区位置支持 `outer|inner|left|right`；`sidebar: false` 关闭。单个选项列数只支持 `auto`、1、2、4。表格还可由蓝图统一设置 `table_font_size`、`table_line_height`、`table_cell_padding_x`、`table_cell_padding_top`、`table_cell_padding_bottom` 和按列数映射的 `table_column_alignments`。
 
 `start_on: left|right` 指定题组的起始页奇偶性；插入的空白页计入封面页数。`page_number_start` 默认为1。`cover: false` 可省略封面和背页。
 
 听力 `items_per_page` 默认为2，正整数表示一个内容页的题数；例题默认独立。阅读 `passages_new_page` 控制是否每篇另起。完形默认 `questions_new_page: true`，材料页后另起题页。`material_line_height` 可单独设置文章行距，G7默认19.8，正式选择题仍用24.05996。
 
-`layout: facing_pages` 保持左页问题、右页参考材料。文字材料用 `reference_font_size`（默认9.2）和 `reference_line_height`（默认13.68），现有同结构的参考页可以复用实测位置；外部图像按长宽比排入。
+听力标题使用 `heading_layout: stacked`；`heading_size`、`instruction_font_size`、`instruction_line_height` 和不超过版心的 `instruction_width` 可调整标题与说明。修改这些值会停用该标题的精确位置并按新参数重排。
+
+`layout: facing_pages` 保持左页问题、右页参考材料。文字材料用 `reference_font_size`（默认9.2）、`reference_line_height`（默认13.68）和 `reference_outset`（默认16.95）控制；现有同结构的参考页可以复用实测位置，外部图像按长宽比排入。
 
 ## 公共元数据
 
@@ -143,19 +147,35 @@ groups:
 | 字段 | 内容 |
 | --- | --- |
 | `labels` | 题册、注意事项、填写栏、时长、页眉页脚等公共显示文字或格式 |
-| `booklets.written`、`booklets.listening` | `title`、`subject_ja`、`subject_en`、`time_minutes`、`notices` |
+| `booklets.written`、`booklets.listening` | `title`、`subject_ja`、`subject_en`、`time_minutes`、`notices`，以及可选封面标识 `session_label`、`form_symbol` |
 | `notices` 每项 | 日文 `text` 和可选英文 `english`；允许 `{body_pages}` |
 | `sections.V/G/R/L.sidebar_label` | 科目侧边分区文字 |
 | `assets` | `written_back`、`listening_back`、`reading_interleaf` 等独立素材引用 |
 
 完整范例为 `content/common/metadata.yaml`。选择顺序是命令行 `--metadata`、当前题库的 `metadata.yaml`、公共文件；整份选择，不逐项合并。`{body_pages}` 由构建时的实际正文页数计算。
 
+`session_label` 和 `form_symbol` 都可以省略、设为 `null` 或空字符串，此时封面不增加任何命令。需要时按题册分别填写：
+
+```yaml
+booklets:
+  written:
+    session_label: "（２０２３－２）"
+    form_symbol: A
+  listening:
+    session_label: "（２０２３－２）"
+    form_symbol: B
+```
+
+`session_label` 接受最多 16 个无空白的可打印字符，并且排版宽度不得超过 220bp；正式年份建议使用全角形式，如 `（２０２３－２）`。`form_symbol` 仅接受单个大写 ASCII 字母。两者只叠加在该题册封面第一页，不移动原有元素。年份使用 Gothic MB101 Pro R 并施加模板规定的粗体效果；圆内字母使用 New Century Schoolbook Roman Regular，外圈是独立矢量图形。两款字体均只在相应字段非空时需要，配置方法及 C059 自由替代见 [FONTS.md](FONTS.md)。
+
 ## 实测容量与错误处理
 
-内容格式同时服务实测组件和重新排版。实测组件检查字段结构、字符容量、空白、注音和标记位置；当前 YAML 的每个字都重新解析，模板内没有旧题文字作为兜底。新增小注或增删字符会使相应组件重新组版，不会导致整册换字体和设计。
+内容格式同时服务精确组件和规则排版。默认构建会自动判断：页面和蓝图保持兼容，且题组的字段结构、字符容量、空白、注音、行内标记及 `style`、`align`、`indent`、表格、图片等布局属性都符合校准契约时，使用精确位置；否则仅将不兼容的题组交给规则排版。当前 YAML 的每个字都会重新解析，模板内没有旧题文字作为兜底。
+
+`--recompose` 会关闭题组、标题和例题的实测位置复用，用同一套字体与规则重新流排整卷。它用于验证自定义题、自动断行和分页，并不承诺复刻参考 PDF 的每个坐标；例如官方解答示例中的专用框格节奏会由通用块规则近似。通常无需手动选择“精确模式”：默认构建已经在安全兼容时自动使用，在内容或布局改变时自动退回规则。
 
 未知材料类型、四选一数量错误、不可分割材料过大或最终缺字会明确报错。题干增减可能改变断行和页数；有限纸面不能在容纳任意内容的同时固定所有旧坐标。
 
-项目 `fonts.yaml` 默认自动加载，使用 `faces` 将五个原字体名称映射到本地完整 OTF/TTF；原稿已有字形和同名字体的其他科目子集优先。可用 `--fonts other-fonts.yaml` 指定另一份本地路径配置。所有路径相对于项目根目录，也支持绝对路径。
+项目 `fonts.yaml` 默认自动加载：`faces` 将五个正文原字体名称映射到本地完整 OTF/TTF，`fonts.cover_session` 与 `fonts.cover_symbol` 配置可选封面字体；原稿已有字形和同名字体的其他科目子集优先。可用 `--fonts other-fonts.yaml` 指定另一份本地路径配置。所有路径相对于项目根目录，也支持绝对路径。
 
 仓库附有现有 A/B 内容所需的字体子集。自编内容出现未收录字符时，按 [FONTS.md](FONTS.md) 配置对应的完整字体。该版本不跨原字体补字，也不启用通用替代字体；缺少文件或所需字形时明确报错。编辑内容不需要在 YAML 中写字体编号或逐字坐标。
