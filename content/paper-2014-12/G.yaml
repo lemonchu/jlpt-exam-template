@@ -100,7 +100,7 @@ groups:
     label: （問題例）
     source_pages:
     - 3
-    prompt: あそこで __　　　__ __　　　__ __★__ __　　　__ は山田さんです。
+    prompt: あそこで __　　　__ __　　　__ __★__ __　　　__ は｜山田《やまだ》さんです。
     options:
     - テレビ
     - 見ている
@@ -111,6 +111,7 @@ groups:
     - type: heading
       text: （解答のしかた）
     - type: paragraph
+      style: bold
       text: １．正しい文はこうです。
     - type: box
       blocks:
@@ -123,7 +124,7 @@ groups:
           - __　　　__
           - __★__
           - __　　　__
-          - は山田さんです。
+          - は｜山田《やまだ》さんです。
         - - ''
           - １　テレビ
           - ３　を
@@ -131,6 +132,7 @@ groups:
           - ４　人
           - ''
     - type: paragraph
+      style: bold
       text: ２．__★__に入る番号を解答用紙にマークします。
     - type: paragraph
       text: （解答用紙）
