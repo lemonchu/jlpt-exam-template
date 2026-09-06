@@ -10,6 +10,7 @@ class Atom:
     ruby: str=''
     width: float=0
     annotation: str=''
+    annotation_span: int=0
 
 OPEN='（([｛{「『【〈《〔'
 CLOSE='、。，．・：；？！ー〜～）)]｝}」』】〉》〕ァィゥェォッャュョぁぃぅぇぉっゃゅょ々'
@@ -19,6 +20,9 @@ REFERENCE_BOX_SUFFIX_WIDTH=11.31
 REFERENCE_BOX_MARGIN=5.655
 REFERENCE_BOX_CLOSING_MARGIN=2.655
 REFERENCE_BOX_CLOSING='、。，．・：；？！）)]｝}」』】〉》'
+REFERENCE_BOX_PATTERN=r'〔([0-9]+)(-[A-Za-z])?〕'
+REFERENCE_BOX_RE=re.compile(REFERENCE_BOX_PATTERN)
+TOKEN_RE=re.compile(REFERENCE_BOX_PATTERN+r'|（[ \u3000]+）|[A-Za-z0-9]+(?:[.\-’\'][A-Za-z0-9]+)*')
 
 def parse(text,bold=False,underline=False):
     """Markup is deliberately small; malformed paired markup is an error."""
@@ -31,7 +35,9 @@ def parse(text,bold=False,underline=False):
             label,inner=text[i+2:end].split('|',1)
             children=parse(inner,bold,underline)
             if not children:raise ValueError('Empty note anchor')
-            children[0]=replace(children[0],annotation=('（'+label+'）') if label.startswith('注') else label)
+            span=sum(sum(not c.isspace() for c in child.text) for child in children)
+            children[0]=replace(children[0],annotation=('（'+label+'）') if label.startswith('注') else label,
+                                annotation_span=span)
             out+=children;i=end+2;continue
         marker=next((m for m in ('__','**') if text.startswith(m,i)),None)
         if marker:
@@ -46,7 +52,7 @@ def parse(text,bold=False,underline=False):
             if not m:raise ValueError(f'Invalid ruby markup near {text[i:]!r}')
             out.append(Atom(m[1],bold,underline,m[2]));i+=len(m[0]);continue
         # A fill-in blank is indivisible; ordinary Latin words also stay together.
-        m=re.match(r'〔[0-9]+(?:-[A-Za-z])?〕|（[ \u3000]+）|[A-Za-z0-9]+(?:[.\-’\'][A-Za-z0-9]+)*',text[i:])
+        m=TOKEN_RE.match(text,i)
         if m:out.append(Atom(m[0],bold,underline));i+=len(m[0]);continue
         out.append(Atom(text[i],bold,underline));i+=1
     return out
@@ -57,7 +63,7 @@ def measure(atoms,catalog,size,section=''):
         base=sum(catalog.width(c,size,a.bold,section) for c in a.text) if a.text!='\n' else 0
         ruby=sum(catalog.width(c,size*.5,a.bold,section) for c in a.ruby)
         if a.underline and a.text=='★':base=max(base,size*3)
-        ref=re.fullmatch(r'〔([0-9]+)(-[A-Za-z])?〕',a.text)
+        ref=REFERENCE_BOX_RE.fullmatch(a.text)
         if ref and getattr(catalog,'compress_ruby',False):
             frame=REFERENCE_BOX_WIDTH+(REFERENCE_BOX_SUFFIX_WIDTH if ref[2] else 0)
             base=(frame+2*REFERENCE_BOX_MARGIN)*size/11.3
@@ -65,7 +71,7 @@ def measure(atoms,catalog,size,section=''):
     if getattr(catalog,'compress_ruby',False):
         reduction=(REFERENCE_BOX_MARGIN-REFERENCE_BOX_CLOSING_MARGIN)*size/11.3
         for i in range(len(result)-1):
-            if re.fullmatch(r'〔[0-9]+(?:-[A-Za-z])?〕',result[i].text) and result[i+1].text[:1] in REFERENCE_BOX_CLOSING:
+            if REFERENCE_BOX_RE.fullmatch(result[i].text) and result[i+1].text[:1] in REFERENCE_BOX_CLOSING:
                 result[i]=replace(result[i],width=result[i].width-reduction)
     return result
 

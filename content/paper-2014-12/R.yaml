@@ -40,10 +40,13 @@ groups:
       blocks:
       - type: paragraph
         text: ＜ミスヌマ健康食品株式会社＞ニュース
+        align: center
       - type: paragraph
         text: 2014年10.14　健康食品［ビタミン生活Ｖ］に関するお知らせ
+        align: right
       - type: paragraph
         text: お客様各位
+        indent: 0
       - type: paragraph
         text: 平素は弊社商品にご愛顧を賜り、厚く御礼申し上げます。
       - type: paragraph
@@ -54,13 +57,13 @@ groups:
         text: お客様にご迷惑をおかけしますことを、深くお詫び申し上げます。
       - type: paragraph
         text: ミスヌマ健康食品株式会社
-        align: right
+        indent: 0
       - type: paragraph
         text: お客様担当係：0120-333-4455
-        align: right
+        indent: 0
       - type: paragraph
         text: ［受付時間10:00-18:00　土日祝休み］
-        align: right
+        indent: 0
     questions:
     - id: R-q47
       source_number: 47
@@ -225,20 +228,20 @@ groups:
     - type: paragraph
       text: しかし、「生活」と「人生」とはどちらも「ライフ」だが、この両者は大違いである。「何のために」生活するのと問われたら、どう答えるだろう。
     - type: paragraph
-      text: こういう基本的なところで大間違いをしているから、小中学校で仕事体験をさせようといった愚にもつかない（注1）教育になる。（中略）生活の必要のない年齢には、生活に必要のないことを学ぶ必要があるのだ。それはこの年齢、このわずかな期間にのみ許された、きわめて貴重な時間なのだ。生活に必要のないことは、人生に必要なことだ。すなわち、人生とは何かを考えるための時間があるのは、この年代の特権なのである。
+      text: こういう基本的なところで大間違いをしているから、小中学校で仕事体験をさせようといった愚にもつかない（注１）教育になる。（中略）生活の必要のない年齢には、生活に必要のないことを学ぶ必要があるのだ。それはこの年齢、このわずかな期間にのみ許された、きわめて貴重な時間なのだ。生活に必要のないことは、人生に必要なことだ。すなわち、人生とは何かを考えるための時間があるのは、この年代の特権なのである。
     - type: paragraph
       text: 「人生とは何か」とは、そこにおいて生活が可能となるところの生存そのもの、これを問う問いである。「生きている」、すなわち「存在する」とは、どういうことなのか。
     - type: paragraph
-      text: この問いの不思議に気がつけば、どの教科も、それを純粋に知ることの面白さがわかるはずだ。国語においては言葉、算数においては数と図形、理科においては物質と生命、社会においては人倫（注2）、どれもこの存在と宇宙の不思議を知ろうとするものだと知るはずだ。人間精神の普遍的な営みとして、自分と無縁なものはひとつもない。どれも自分の人生の役に立つ学びだと知るはずなのだ。
+      text: この問いの不思議に気がつけば、どの教科も、それを純粋に知ることの面白さがわかるはずだ。国語においては言葉、算数においては数と図形、理科においては物質と生命、社会においては人倫（注２）、どれもこの存在と宇宙の不思議を知ろうとするものだと知るはずだ。人間精神の普遍的な営みとして、自分と無縁なものはひとつもない。どれも自分の人生の役に立つ学びだと知るはずなのだ。
     - type: paragraph
       text: （池田晶子『人間自身――考えることに終わりなく』による）
       style: small
       align: right
     - type: paragraph
-      text: （注1）愚にもつかない：ここでは、ばかばかしい
+      text: （注１）愚にもつかない：ここでは、ばかばかしい
       style: small
     - type: paragraph
-      text: （注2）人倫：人として守るべき道
+      text: （注２）人倫：人として守るべき道
       style: small
     questions:
     - id: R-q56
@@ -287,9 +290,9 @@ groups:
     - type: paragraph
       text: 「絵」などというから、大人の「絵画作品」と混同して考えてしまう。そこにズレがおこる。大人のは見せる芸であり、商品である。はじめから観賞すること、してもらうことを目的とし、結果を予測しながら作り上げたものなのだ。
     - type: paragraph
-      text: いわゆる「絵描きさん」となると、描いている瞬間瞬間に、結果がわかっている。こうやれば、こうなる。習練（注1） と経験によって、色やタッチ（注2）の効果が計算できるし、生命の衝動、情熱、無目的な行動よりも、結果の方に神経が働いてしまう。出来ばえに、逆にひきずり回されているのだ。
+      text: いわゆる「絵描きさん」となると、描いている瞬間瞬間に、結果がわかっている。こうやれば、こうなる。習練（注１）と経験によって、色やタッチ（注２）の効果が計算できるし、生命の衝動、情熱、無目的な行動よりも、結果の方に神経が働いてしまう。出来ばえに、逆にひきずり回されているのだ。
     - type: paragraph
-      text: しかも、大向こう（注3）の気配まですでに見すかして、……こんな趣向は喜ばれるだろう、これはちょっとやりすぎかな、などと意識・無意識に、そんな手応えにあわせながら仕事をすすめている。評判をとり、買手がついてくれなければ食ってゆけないし、社会が許さない。生活はきびしいのだ。無償の行為というわけにはいかない。
+      text: しかも、大向こう（注３）の気配まですでに見すかして、……こんな趣向は喜ばれるだろう、これはちょっとやりすぎかな、などと意識・無意識に、そんな手応えにあわせながら仕事をすすめている。評判をとり、買手がついてくれなければ食ってゆけないし、社会が許さない。生活はきびしいのだ。無償の行為というわけにはいかない。
     - type: paragraph
       text: 明らかに「作品」つまり「商品」を作っているのである。
     - type: paragraph
@@ -301,13 +304,13 @@ groups:
       style: small
       align: right
     - type: paragraph
-      text: （注1）習練：練習
+      text: （注１）習練：練習
       style: small
     - type: paragraph
-      text: （注2）タッチ：ここでは、筆の使い方
+      text: （注２）タッチ：ここでは、筆の使い方
       style: small
     - type: paragraph
-      text: （注3）大向こう：ここでは、観賞する人々
+      text: （注３）大向こう：ここでは、観賞する人々
       style: small
     questions:
     - id: R-q59
@@ -471,13 +474,21 @@ groups:
     stimulus:
     - type: paragraph
       text: 就職支援行事（9月-12月）のスケジュール
+      style: bold
       align: center
+      indent: 0
     - type: paragraph
       text: 就職活動を行う学生のために、各種行事を実施しています。
+      indent: 0
     - type: paragraph
       text: 全行事、申し込みは不要です。当日、学生証を持参のうえ、会場へお越し下さい。
+      indent: 0
     - type: table
-      header_rows: 0
+      header_rows: 1
+      header_bold: false
+      header_fill: false
+      header_alignments: [center, center, center, center, center]
+      column_alignments: [center, center, center, center, left]
       rows:
       - - ''
         - 日
@@ -535,26 +546,37 @@ groups:
         - 合同企業説明会
         - 詳細は下記参照
     - type: paragraph
-      text: 開催時間：ア…14:50-16:20　イ…18:30-20:00
-    - type: paragraph
-      text: ＊合同企業説明会は下記参照
+      text: 開催時間：ア…14:50-16:20　イ…18:30-20:00　　＊合同企業説明会は下記参照
+      indent: 0
     - type: paragraph
       text: 開催場所：⑥以外…緑山ホール　⑥…101教室
+      indent: 0
     - type: box
       blocks:
       - type: paragraph
         text: 注意事項
+        style: bold
+        align: center
+        indent: 0
       - type: paragraph
         text: ・就職希望者（留学生含む）は、［就職ガイダンス］のどちらかに必ず出席してください。
+        indent: 0
       - type: paragraph
         text: ・［留学生ガイダンス］は希望者のみ出席してください。
+        indent: 0
     - type: paragraph
       text: 合同企業説明会について
+      style: bold
       align: center
+      indent: 0
     - type: paragraph
       text: 合同企業説明会は業種別に、以下の日時に開催されます。各回、約50社が参加予定です。（途中入退場自由）
+      indent: 0
     - type: table
-      header_rows: 0
+      header_rows: 1
+      header_bold: false
+      header_fill: false
+      column_alignments: [center, center, center]
       rows:
       - - ''
         - 12月1日
@@ -570,7 +592,7 @@ groups:
         - 教育・福祉
     - type: paragraph
       text: 緑山大学就職課
-      align: right
+      indent: 0
     questions:
     - id: R-q69
       source_number: 69

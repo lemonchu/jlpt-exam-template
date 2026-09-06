@@ -27,12 +27,7 @@ def _advance(layout, ch, size):
     # tracking must not leak into a measured running head.
     if ord(ch) >= 0x3000:
         return size
-    old_role = getattr(layout.catalog, 'role', None)
-    layout.catalog.role = 'header'
-    try:
-        return layout.catalog.width(ch, size, False, layout.section)
-    finally:
-        layout.catalog.role = old_role
+    return layout.catalog.width(ch, size, False, layout.section, role='header')
 
 
 def _header_chars(layout, text, size):

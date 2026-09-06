@@ -1,5 +1,4 @@
 """Export only used Unicode mappings, retaining the original outlines/metrics."""
-from pathlib import Path
 from fontTools.ttLib import TTFont
 from fontTools import subset
 

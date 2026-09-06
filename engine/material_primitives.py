@@ -3,23 +3,24 @@
 All text is emitted by ComponentLayout through the common scene renderer.
 """
 from pathlib import Path
-from math import ceil
-import json, shutil, hashlib, copy, re
+import shutil
 import fitz
-from inline import lines,parse,plain,measure
+from inline import lines,parse
 
 DEFAULT_PAGE={'width':595,'height':842,'margin_left':78.96,'margin_right':63.63,'margin_top':62.4928,'margin_bottom':59,'font_size':11.3,'line_height':24.05996}
+VERTICAL_FORMS={'、':'︑','。':'︒','「':'﹁','」':'﹂','『':'﹃','』':'﹄','（':'︵','）':'︶','(':'︵',')':'︶'}
+VERTICAL_ROTATED='ー—―〜～'
 
 class MaterialPrimitives:
     def __init__(self,catalog,blueprint,resources,out):
         self.catalog=catalog;self.bp=blueprint;self.resources=Path(resources);self.out=Path(out)
         self.p=dict(DEFAULT_PAGE,**blueprint.get('page',{}));self.W=float(self.p['width']);self.H=float(self.p['height'])
-        self.left=float(self.p['margin_left']);self.right=self.W-float(self.p['margin_right']);self.width=self.right-self.left
+        self.left=float(self.p['margin_left']);right=self.W-float(self.p['margin_right']);self.width=right-self.left
         self.top=float(self.p['margin_top']);self.bottom=self.H-float(self.p['margin_bottom']);self.fs=float(self.p['font_size']);self.leading=float(self.p['line_height'])
         if self.width<80 or self.bottom-self.top<100:raise ValueError('Page margins leave insufficient usable space')
-        self.pages=[];self.page=None;self.y=self.top;self.section='';self.group=None;self.gc={};self.bands=[]
-        self.number=int(blueprint.get('numbering',{}).get('start',1));self.group_number=1;self.item_records=[];self.assets={};self.warnings=[];self.semantic_glyphs=[]
-        self.components=blueprint.get('components',{});self.start_page=int(blueprint.get('page_number_start',1))
+        self.pages=[];self.page=None;self.y=self.top;self.section='';self.group=None;self.gc={}
+        self.number=int(blueprint.get('numbering',{}).get('start',1));self.group_number=1;self.item_records=[];self.assets=set();self.image_sizes={};self.semantic_glyphs=[]
+        self.start_page=int(blueprint.get('page_number_start',1))
 
     @property
     def usable(self):return self.bottom-self.top
@@ -55,13 +56,15 @@ class MaterialPrimitives:
         if not src.is_relative_to((self.resources/'assets').resolve()) or not src.is_file():raise FileNotFoundError(f'Asset unavailable: {name}')
         target=Path('assets')/rel;dest=self.out/target;dest.parent.mkdir(parents=True,exist_ok=True)
         if str(target) not in self.assets:
-            shutil.copyfile(src,dest);self.assets[str(target)]=hashlib.sha256(src.read_bytes()).hexdigest()
-        with fitz.open(src) as doc:r=doc[0].rect
-        return target.as_posix(),r.width/r.height
+            shutil.copyfile(src,dest);self.assets.add(str(target))
+        return target.as_posix()
 
     def image_geometry(self,b,width):
-        name,ratio=self.asset(b['asset'])
-        with fitz.open(self.out/name) as source:intrinsic_width=source[0].rect.width
+        name=self.asset(b['asset'])
+        if name not in self.image_sizes:
+            with fitz.open(self.out/name) as source:rect=source[0].rect
+            self.image_sizes[name]=(rect.width,rect.height)
+        intrinsic_width,intrinsic_height=self.image_sizes[name];ratio=intrinsic_width/intrinsic_height
         w=min(width,float(b.get('width',self.gc.get('image_max_width',intrinsic_width))))
         h=float(b.get('height',w/ratio))
         return name,w,h
@@ -100,7 +103,7 @@ class MaterialPrimitives:
         if t=='box':return sum(self.estimate_block(z,self.box_width(b,width)-16) for z in b.get('blocks',[]))+22
         if t=='memo':return min(float(b.get('height',260)),self.usable)
         if t=='image':
-            _,w,h=self.image_geometry(b,width);return min(h,self.usable)+4
+            _,_,h=self.image_geometry(b,width);return min(h,self.usable)+4
         if t=='table':
             _,table_width=self.table_geometry(b,0,width)
             return sum(self.table_rows(b,table_width)[1])+6
@@ -120,17 +123,9 @@ class MaterialPrimitives:
             h=min(float(b.get('height',260)),self.usable)
             self.ensure(h);self.paragraph(b.get('label','－メモ－'),x,width,align='center');self.y+=max(0,h-max(self.leading,self.fs*1.82))
         elif t=='box':
-            if any(child.get('type')=='vertical' for child in b.get('blocks',[])):
-                narrow=min(width,float(self.gc.get('vertical_width',245)))
-                x+=(width-narrow)/2;width=narrow
-            elif len(b.get('blocks',[]))==1 and b['blocks'][0].get('type')=='image':
-                _,image_width,_=self.image_geometry(b['blocks'][0],width-16)
-                narrow=min(width,image_width+16);x+=(width-narrow)/2;width=narrow
+            narrow=self.box_width(b,width);x+=(width-narrow)/2;width=narrow
             est=self.estimate_block(b,width)
-            under_heading=getattr(self,'_flow_initial_page_ref',None)==id(self.page)
-            # The first passage may start below its group heading and continue
-            # on the next page. Do not let its enclosing box undo that decision.
-            if est<=self.usable and not (under_heading and est>self.bottom-self.y):self.ensure(est)
+            if est<=self.usable:self.ensure(est)
             else:self.ensure(min(est,2*self.leading+16))
             starts={len(self.pages)-1:self.y};self.y+=8
             self.blocks(b.get('blocks',[]),x+8,width-16)
@@ -154,12 +149,36 @@ class MaterialPrimitives:
         if not isinstance(configured,dict):raise ValueError('table_column_widths must map column counts to weight lists')
         weights=b.get('column_widths',configured.get(n,configured.get(str(n),[1]*n)))
         if len(weights)!=n or min(weights)<=0:raise ValueError('Invalid table column widths')
-        widths=[width*w/sum(weights) for w in weights];size=self.fs*.91;lead=max(size*1.8,18)
+        widths=[width*w/sum(weights) for w in weights]
+        def metric(name,default,allow_zero=False):
+            raw=b.get(name,self.gc.get(name,default))
+            if isinstance(raw,bool):raise ValueError(f'{name} must be a number')
+            try:value=float(raw)
+            except (TypeError,ValueError) as e:raise ValueError(f'{name} must be a number') from e
+            if value<0 or (not allow_zero and value==0):raise ValueError(f'{name} must be positive')
+            return value
+        size=metric('table_font_size',self.fs*.91)
+        lead=metric('table_line_height',max(size*1.8,18))
+        pad_x=metric('table_cell_padding_x',5,True)
+        pad_top=metric('table_cell_padding_top',4,True)
+        pad_bottom=metric('table_cell_padding_bottom',6,True)
+        if any(w<=2*pad_x for w in widths):raise ValueError('Table cell padding leaves no text width')
+        configured_alignments=self.gc.get('table_column_alignments',{})
+        if not isinstance(configured_alignments,dict):raise ValueError('table_column_alignments must map column counts to alignment lists')
+        alignments=b.get('column_alignments',configured_alignments.get(n,configured_alignments.get(str(n),['left']*n)))
+        if not isinstance(alignments,list) or len(alignments)!=n or any(a not in ('left','center','right') for a in alignments):
+            raise ValueError('Table column alignments must provide left, center, or right for every column')
+        headers=int(b.get('header_rows',0))
+        header_bold=b.get('header_bold',True)
+        if not isinstance(header_bold,bool):raise ValueError('Table header_bold must be true or false')
+        header_alignments=b.get('header_alignments',alignments)
+        if not isinstance(header_alignments,list) or len(header_alignments)!=n or any(a not in ('left','center','right') for a in header_alignments):
+            raise ValueError('Table header alignments must provide left, center, or right for every column')
         prepared=[];heights=[]
         for i,row in enumerate(rows):
-            cells=[self.get_lines(str(s),size,w-10,bold=i<int(b.get('header_rows',0))) for s,w in zip(row,widths)]
-            prepared.append(cells);heights.append(max(len(c) for c in cells)*lead+10)
-        return (widths,heights,prepared,size,lead)
+            cells=[self.get_lines(str(s),size,w-2*pad_x,bold=header_bold and i<headers) for s,w in zip(row,widths)]
+            prepared.append(cells);heights.append(max(len(c) for c in cells)*lead+pad_top+pad_bottom)
+        return (widths,heights,prepared,size,lead,alignments,header_alignments,pad_x,pad_top)
 
     def table_geometry(self,b,x,width):
         configured=b.get('width',width)
@@ -176,13 +195,16 @@ class MaterialPrimitives:
         x,width=self.table_geometry(b,x,width)
         borders=b.get('borders',True)
         if not isinstance(borders,bool):raise ValueError('Table borders must be true or false')
-        widths,heights,prepared,size,lead=self.table_rows(b,width);headers=int(b.get('header_rows',0))
+        widths,heights,prepared,size,lead,alignments,header_alignments,pad_x,pad_top=self.table_rows(b,width);headers=int(b.get('header_rows',0))
+        header_fill=b.get('header_fill',True)
+        if not isinstance(header_fill,bool):raise ValueError('Table header_fill must be true or false')
         def drawrow(i):
             h=heights[i];self.ensure(h);xx=x
-            for ls,w in zip(prepared[i],widths):
-                fill='.94 .94 .94' if i<headers else None
+            row_alignments=header_alignments if i<headers else alignments
+            for ls,w,alignment in zip(prepared[i],widths,row_alignments):
+                fill='.94 .94 .94' if header_fill and i<headers else None
                 if fill or borders:self.rect(xx,self.y,w,h,fill=fill,stroke=borders)
-                for j,ln in enumerate(ls):self.line(ln,xx+5,self.y+4+j*lead,size)
+                for j,ln in enumerate(ls):self.line(ln,xx+pad_x,self.y+pad_top+j*lead,size,alignment,w-2*pad_x)
                 xx+=w
             self.y+=h
         for i in range(len(prepared)):
@@ -214,11 +236,10 @@ class MaterialPrimitives:
             for ci,column in enumerate(batch):
                 xx=x+(width+len(batch)*pitch)/2-size-(ci*pitch)
                 for ri,(ch,a,ai) in enumerate(column):
-                    yy=self.y+size*1.15+ri*size*1.04;dx=0;dy=0;rot=0
-                    vertical_forms={'、':'︑','。':'︒','「':'﹁','」':'﹂','『':'﹃','』':'﹄','（':'︵','）':'︶','(':'︵',')':'︶'}
-                    drawn=vertical_forms.get(ch,ch)
-                    if ch in 'ー—―〜～':rot=-90
-                    self.glyph(drawn,size,xx+dx,yy+dy,a.bold,rotation=rot,semantic_char=ch)
+                    yy=self.y+size*1.15+ri*size*1.04
+                    drawn=VERTICAL_FORMS.get(ch,ch)
+                    rotation=-90 if ch in VERTICAL_ROTATED else 0
+                    self.glyph(drawn,size,xx,yy,a.bold,rotation=rotation,semantic_char=ch)
                     if a.underline:self.rule(xx+size*1.13,yy-size*.9,xx+size*1.13,yy+size*.05)
                     if a.ruby and ai==0:
                         span=len(a.text)*size*1.04;rs=size*.48

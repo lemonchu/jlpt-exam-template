@@ -1,12 +1,27 @@
 """Measured component constraints: geometry and semantic field references only."""
 from pathlib import Path
 import json,copy,re
-from semantic_bindings import shape,skeleton,field_value,chars_for,normal,CalibrationMismatch
-from metadata_bindings import resolve as metadata_runs
+from semantic_bindings import shape,skeleton,layout_fingerprint,field_value,chars_for,normal,CalibrationMismatch
+from metadata_bindings import load_metadata, resolve_loaded
+
+BODY_MARGINS = {'L': (63.45, 45.21), 'written': (78.96, 63.63)}
+
+
+def _integer_at_least(value, minimum):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= minimum
+
+
+def _body_left(section, printed_page):
+    margins = BODY_MARGINS['L' if section == 'L' else 'written']
+    return margins[0 if printed_page % 2 else 1]
+
 
 class ReferenceComponents:
     def __init__(self,profile,metadata_path):
-        self.profile=Path(profile);self.metadata_path=metadata_path
+        self.profile=Path(profile);self.metadata_path=Path(metadata_path)
+        self.metadata_bindings=json.loads((self.profile/'metadata-bindings.json').read_text())
+        self.metadata=load_metadata(self.metadata_path,self.metadata_bindings)
+        self._metadata_cache={None:self.metadata}
         self.layout=json.loads((self.profile/'layout.json').read_text())
         self.bindings=json.loads((self.profile/'body-bindings.json').read_text())
         self.components=json.loads((self.profile/'components.json').read_text())['groups']
@@ -14,11 +29,22 @@ class ReferenceComponents:
         self.run_specs={c['run_id']:c for p in self.pages.values() for c in p['commands'] if c['type']=='run'}
         capacity=self.profile/'glyph-capacities.json'
         self.glyph_capacities=json.loads(capacity.read_text())['widths'] if capacity.exists() else {}
+        contracts=self.profile/'composition-contracts.json'
+        self.contracts=json.loads(contracts.read_text()) if contracts.exists() else {}
+        self.layout_contracts=self.contracts.get('content_layout_sha256',{})
+        if not isinstance(self.layout_contracts,dict):raise ValueError('Invalid content layout contracts')
+        missing=set(self.components)-set(self.layout_contracts)
+        if missing:raise ValueError('Missing content layout contracts: '+', '.join(sorted(missing)))
         self.fonts=None
         self.metadata_audit=[]
         self.resolved={};self.ledger=[]
+    def require_layout_compatibility(self,group):
+        expected=self.layout_contracts.get(group['id'])
+        if expected is None:raise CalibrationMismatch('Measured component has no content layout contract')
+        if layout_fingerprint(group)!=expected:
+            raise CalibrationMismatch('Content layout attributes changed')
     def resolve_runs(self,group,run_ids):
-        spec=self.components[group['id']];sec=spec['section'];gi=spec['group_index']
+        spec=self.components[group['id']];gi=spec['group_index']
         data={'groups':[None]*(gi+1)};data['groups'][gi]=group
         needed={ref['field'] for rid in run_ids for g in self.bindings['runs'][rid]['glyphs'] for ref in g['refs']}
         values={}
@@ -58,15 +84,16 @@ class ReferenceComponents:
     def body_runs(self,page):return [c['run_id'] for c in page['commands'] if c['type']=='run' and c['run_id'] in self.bindings['runs']]
     def meta(self,commands,body_pages=None):
         runs=[c['run_id'] for c in commands if c['type']=='run' and c['run_id'] not in self.bindings['runs']]
-        return metadata_runs(self.metadata_path,self.profile/'metadata-bindings.json',body_pages=body_pages,run_ids=runs)['runs']
+        if body_pages not in self._metadata_cache:
+            self._metadata_cache[body_pages]=load_metadata(self.metadata_path,self.metadata_bindings,body_pages)
+        return resolve_loaded(self._metadata_cache[body_pages],self.metadata_bindings,
+                              self.metadata_path.name,run_ids=runs)['runs']
     def _relocated_body(self,page,section,source_number,printed_page,group_id):
         """Move measured body geometry; the caller supplies fresh page furniture."""
-        import yaml
-        if isinstance(printed_page,bool) or not isinstance(printed_page,int) or printed_page<1:
+        if not _integer_at_least(printed_page,1):
             raise CalibrationMismatch('Printed page must be a positive integer')
-        margins=(63.45,45.21) if section=='L' else (78.96,63.63)
-        source_left=margins[0 if source_number%2 else 1]
-        target_left=margins[0 if printed_page%2 else 1]
+        source_left=_body_left(section,source_number)
+        target_left=_body_left(section,printed_page)
         dx=target_left-source_left
         # One scope preserves graphics-state changes shared by vector chunks.
         # Clip in source coordinates before moving to the target mirror margin.
@@ -85,48 +112,45 @@ class ReferenceComponents:
                 command=copy.deepcopy(source);command['x']+=dx;commands.append(command)
         bands=[]
         if section!='L':
-            metadata=yaml.safe_load(Path(self.metadata_path).read_text())
-            bands=[{'section':section,'text':metadata['sections'][section]['sidebar_label']}]
+            bands=[{'section':section,'text':self.metadata['sections'][section]['sidebar_label']}]
         return {'commands':commands,'bands':bands,'group_ids':[group_id],'measured_body':True}
-    def take_page(self,group,page_info,printed_page,refresh_furniture=False):
-        page=copy.deepcopy(self.pages[(group['id'][0],page_info['source_page'])])
-        current,ledger=self.resolve_runs(group,self.body_runs(page))
+    def _prepare_page(self,group,page_info,printed_page,refresh_furniture):
+        section=group['id'][0]
+        page=copy.deepcopy(self.pages[(section,page_info['source_page'])])
+        resolved,ledger=self.resolve_runs(group,self.body_runs(page))
         furniture=None
         if page_info['printed_page']==printed_page and not refresh_furniture:
             try:furniture=self.meta(page['commands'])
             except ValueError:pass
         if furniture is not None:
-            current.update(furniture)
+            resolved.update(furniture)
             result={'commands':page['commands'],'bands':[],'group_ids':[group['id']],'measured':True}
         else:
-            result=self._relocated_body(page,group['id'][0],page_info['printed_page'],printed_page,group['id'])
+            result=self._relocated_body(page,section,page_info['printed_page'],printed_page,group['id'])
+        return result,resolved,ledger
+    def take_page(self,group,page_info,printed_page,refresh_furniture=False):
+        self.require_layout_compatibility(group)
+        result,current,ledger=self._prepare_page(group,page_info,printed_page,refresh_furniture)
         self.resolved.update(current);self.ledger+=ledger
         return result
     def take_group(self,group,printed_page,refresh_furniture=False):
         if group['id'] not in self.components:raise CalibrationMismatch('New question group')
+        self.require_layout_compatibility(group)
         spec=self.components[group['id']];gi=spec['group_index'];sec=spec['section']
         expected=self.bindings['skeletons'][sec]['groups'][gi]
         if skeleton(group)!=expected:raise CalibrationMismatch('Question/block count changed')
         pages=[];pending={};ledger=[]
         for i,info in enumerate(spec['pages']):
-            page=copy.deepcopy(self.pages[(sec,info['source_page'])]);rr,ll=self.resolve_runs(group,self.body_runs(page))
+            page,rr,ll=self._prepare_page(group,info,printed_page+i,refresh_furniture)
             pending.update(rr);ledger+=ll
-            furniture=None
-            if printed_page+i==info['printed_page'] and not refresh_furniture:
-                try:furniture=self.meta(page['commands'])
-                except ValueError:pass
-            if furniture is not None:
-                pending.update(furniture)
-                pages.append({'commands':page['commands'],'bands':[],'group_ids':[group['id']],'measured':True})
-            else:
-                pages.append(self._relocated_body(page,sec,info['printed_page'],printed_page+i,group['id']))
+            pages.append(page)
         self.resolved.update(pending);self.ledger+=ledger
         return pages
-    def heading(self,group,printed_page,left):
+    def heading(self,group,left):
         if group['id'] not in self.components:raise CalibrationMismatch('New question heading')
         spec=self.components[group['id']];first=spec['pages'][0];page=self.pages[(group['id'][0],first['source_page'])]
         rr,ll=self.resolve_runs(group,spec['heading_runs'])
-        source_left=(63.45 if first['printed_page']%2 else 45.21) if group['id'][0]=='L' else (78.96 if first['printed_page']%2 else 63.63)
+        source_left=_body_left(group['id'][0],first['printed_page'])
         dx=left-source_left;bottom=spec['heading_end_top'];commands=[]
         for c in page['commands']:
             c=copy.deepcopy(c)
@@ -145,9 +169,10 @@ class ReferenceComponents:
         first prompt baseline is returned in top-origin bp for flowing content.
         No surrounding item or page furniture is copied into the result.
         """
+        self.require_layout_compatibility(group)
         try:
             spec=self.components[group['id']];sec=spec['section'];gi=spec['group_index']
-            if isinstance(item_index,bool) or not isinstance(item_index,int) or item_index<0:
+            if not _integer_at_least(item_index,0):
                 raise CalibrationMismatch('Item index must be a nonnegative integer')
             item=group['items'][item_index]
             expected=self.bindings['skeletons'][sec]['groups'][gi]['items'][item_index]
@@ -177,7 +202,7 @@ class ReferenceComponents:
         source_page,page,_=locations[0]
         source_info=next((p for p in spec['pages'] if p['source_page']==source_page),None)
         if source_info is None:raise CalibrationMismatch('Measured item page is outside its group')
-        if not isinstance(printed_page,int) or printed_page<1:
+        if not _integer_at_least(printed_page,1):
             raise CalibrationMismatch('Printed page must be a positive integer')
         page_height=self.layout['paper']['height'];page_width=self.layout['paper']['width']
         body=[c for c in page['commands'] if c['type']=='run' and c['run_id'] in run_fields]
@@ -207,8 +232,7 @@ class ReferenceComponents:
                      for f in run_fields[c['run_id']])]
         if not prompts:raise CalibrationMismatch('Following item has no body text baseline')
         next_body_baseline=min(page_height-c['y'] for c in prompts)
-        source_left=((63.45 if source_info['printed_page']%2 else 45.21) if sec=='L'
-                     else (78.96 if source_info['printed_page']%2 else 63.63))
+        source_left=_body_left(sec,source_info['printed_page'])
         dx=float(left)-source_left
         # Keep all vector chunks in one graphics-state scope: later chunks can
         # inherit the original line width/dash settings from the first chunk.
@@ -226,7 +250,67 @@ class ReferenceComponents:
                 command=copy.deepcopy(source);command['x']+=dx;commands.append(command)
         self.resolved.update(rr);self.ledger+=ll
         return commands,next_body_baseline
+    def _cover_marks(self, booklet):
+        """Build optional first-page identifiers from validated metadata only."""
+        booklet_data=self.metadata.get('booklets',{}).get(booklet,{})
+        session=booklet_data.get('session_label')
+        symbol=booklet_data.get('form_symbol')
+        if session=='':session=None
+        if symbol=='':symbol=None
+        if session is not None:
+            unsafe=lambda ch: (not ch.isprintable() or ch.isspace() or
+                0xE000<=ord(ch)<=0xF8FF or 0xF0000<=ord(ch)<=0xFFFFD or 0x100000<=ord(ch)<=0x10FFFD)
+            if not isinstance(session,str) or len(session)>16 or any(unsafe(ch) for ch in session):
+                raise ValueError(f'booklets.{booklet}.session_label must be null, empty, or a short printable label without whitespace')
+        if symbol is not None and (not isinstance(symbol,str) or not re.fullmatch(r'[A-Z]',symbol)):
+            raise ValueError(f'booklets.{booklet}.form_symbol must be null or one uppercase ASCII letter')
+        if session is None and symbol is None:
+            return [],{}
+        if self.fonts is None:
+            raise ValueError('Optional cover marks require the configured component font resolver')
+
+        def centered_run(text,font,sx,sy,center_x,baseline,run_id,role,max_width=None):
+            offsets=[];advance=0.0
+            for char in text:
+                offsets.append(advance)
+                fid,code=self.fonts.resolver.resolve(font,char,'normal')
+                face=self.fonts.faces[fid]
+                advance+=face.widths[code]/face.upm*sy
+            width=advance*sx/sy
+            if max_width is not None and width>max_width+1e-7:
+                raise ValueError(f'booklets.{booklet}.session_label is {width:.2f}bp wide; maximum is {max_width:.0f}bp')
+            x=center_x-width/2
+            command={'type':'run','run_id':run_id,'font':font,'sx':sx,'sy':sy,
+                     'x':x,'y':baseline,'offsets':offsets,'slot_count':len(text),
+                     'shear':0,'forms':['normal']*len(text),'role':role}
+            return command,{run_id:{'glyphs':list(text)}}
+
+        commands=[];resolved={}
+        if session is not None:
+            command,runs=centered_run(session,self.fonts.configured('cover_session'),25.0,25.0,297.5,719.2,
+                                      f'cover-{booklet}-session-label','cover-session-label',220.0)
+            commands.append(command);resolved.update(runs)
+        if symbol is not None:
+            center_x=42.36;center_y=self.layout['paper']['height']-27.33
+            radius=29.3/2;k=radius*.552284749831
+            circle=(f'q 0.65 w 0.13725 0.12157 0.12549 RG '
+                    f'{center_x+radius:.12g} {center_y:.12g} m '
+                    f'{center_x+radius:.12g} {center_y+k:.12g} {center_x+k:.12g} {center_y+radius:.12g} {center_x:.12g} {center_y+radius:.12g} c '
+                    f'{center_x-k:.12g} {center_y+radius:.12g} {center_x-radius:.12g} {center_y+k:.12g} {center_x-radius:.12g} {center_y:.12g} c '
+                    f'{center_x-radius:.12g} {center_y-k:.12g} {center_x-k:.12g} {center_y-radius:.12g} {center_x:.12g} {center_y-radius:.12g} c '
+                    f'{center_x+k:.12g} {center_y-radius:.12g} {center_x+radius:.12g} {center_y-k:.12g} {center_x+radius:.12g} {center_y:.12g} c S Q')
+            commands.append({'type':'vector','pdf':circle})
+            # The official A/B marks are optically, not merely advance-width,
+            # centered. Other letters retain the neutral placement.
+            dx,dy={'A':(0.0,1.15),'B':(0.25,-0.3)}.get(symbol,(0.0,0.0))
+            command,runs=centered_run(symbol,self.fonts.configured('cover_symbol'),23.6,23.6,center_x+dx,806.1+dy,
+                                      f'cover-{booklet}-form-symbol','cover-form-symbol')
+            commands.append(command);resolved.update(runs)
+        return commands,resolved
+
     def cover(self,section,body_pages):
+        booklet='listening' if section=='L' else 'written'
+        mark_commands,mark_runs=self._cover_marks(booklet)
         pages=[]
         for i in (1,2):
             page=copy.deepcopy(self.pages[(section,i)])
@@ -235,5 +319,8 @@ class ReferenceComponents:
                 page['commands'],runs,audit=resolve_metadata_components(self.profile,self.metadata_path,page['commands'],self.fonts,body_pages=body_pages)
                 self.resolved.update(runs);self.metadata_audit.append(audit)
             else:self.resolved.update(self.meta(page['commands'],body_pages))
+            if i==1:
+                page['commands'].extend(copy.deepcopy(mark_commands))
+                self.resolved.update(mark_runs)
             pages.append(page)
         return pages

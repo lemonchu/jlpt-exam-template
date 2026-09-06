@@ -6,25 +6,28 @@ then the bundled sample subset of that face. A configured complete font is used
 only for a missing glyph; a different source face is never substituted.
 
 Configuration paths are relative to project_root; absolute font paths also work.
-User fonts are copied, unmodified, to content-addressed files under the profile,
-so Resolver.export can produce a standalone, portable LaTeX project unchanged.
+User fonts remain at their configured paths. Generated LaTeX projects reference
+those paths while xdvipdfmx embeds the required glyphs in the final PDF, so no
+standalone copy or subset of a user-supplied font is left in the output.
 """
 from pathlib import Path
-from functools import lru_cache
 import hashlib
-import os
-import shutil
-import tempfile
 import sys
 
 import yaml
 from fontTools.ttLib import TTFont, TTLibError
 
-ROLES = ('mincho_regular', 'mincho_bold', 'gothic_regular', 'gothic_bold')
+TEXT_ROLES = ('mincho_regular', 'mincho_bold', 'gothic_regular', 'gothic_bold')
+COVER_ROLES = {
+    # The reference uses Gothic MB101 R with a modest synthetic embolden.
+    'cover_session': {'id': 'CF001', 'family': 'cover-session', 'fontspec_features': ['FakeBold=1.5']},
+    'cover_symbol': {'id': 'CF002', 'family': 'cover-symbol', 'fontspec_features': []},
+}
+ROLES = TEXT_ROLES + tuple(COVER_ROLES)
 
 
 def font_role(record):
-    """Return mincho/gothic + weight; custom symbol fonts have no text role."""
+    """Return a body mincho/gothic role; custom and cover fonts have none."""
     family = record.get('fallback_family') if record.get('family') == 'fallback' else record.get('family')
     if family not in ('mincho', 'gothic'):
         return None
@@ -45,6 +48,26 @@ def _fallback_family(record):
 def _font_name(record):
     # The extracted source catalog uses the same face name across V/G/R/L.
     return record.get('name', '').lower()
+
+
+def _validate_tex_path(path, role):
+    unsafe = sorted(set(path.as_posix()) & set('#%{}\\$&^~'))
+    if unsafe or any(ord(char) < 32 for char in path.as_posix()):
+        detail = ''.join(unsafe) or 'control character'
+        raise ValueError(f'Font path for {role} contains TeX-special characters ({detail}); rename or move the file')
+
+
+def _cover_warnings(role, font_name, weight):
+    normalized = ''.join(char for char in font_name.lower() if char.isalnum())
+    if role == 'cover_session':
+        if weight is not None and weight >= 500:
+            raise ValueError('fonts.cover_session must use Gothic MB101 Pro R; a medium or bold face would also receive FakeBold')
+        return ([] if 'gothicmb101' in normalized and 'regular' in normalized else
+                [f'cover_session: expected GothicMB101Pro-Regular, got {font_name}'])
+    if role == 'cover_symbol':
+        expected = ('newcenturyschlbkroman' in normalized or 'c059roman' in normalized)
+        return [] if expected else [f'cover_symbol: expected NewCenturySchlbk-Roman or C059-Roman, got {font_name}']
+    return []
 
 
 def _config(config_path, project_root):
@@ -93,6 +116,7 @@ def _register(resolver, role, value, project_root, *, fid=None, source_face=None
     if not path.is_absolute():
         path = project_root / path
     path = path.resolve()
+    _validate_tex_path(path, role)
     if not path.is_file():
         raise ValueError(f'Font for {role} does not exist: {path}. Relative font paths are resolved from {project_root}')
     if path.suffix.lower() not in ('.otf', '.ttf'):
@@ -109,39 +133,35 @@ def _register(resolver, role, value, project_root, *, fid=None, source_face=None
         raise ValueError(f'Cannot load font for {role} from {path}: {e}') from e
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     fid = fid or 'UF%03d' % (ROLES.index(role) + 1)
-    rel = Path('fonts') / 'overrides' / (fid + '-' + digest[:16] + path.suffix.lower())
-    target = resolver.resources / rel
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
-        # Content-addressing + atomic rename also makes concurrent A/B builds safe.
-        fd, temporary = tempfile.mkstemp(prefix='font-', suffix='.tmp', dir=target.parent)
-        os.close(fd)
-        try:
-            shutil.copyfile(path, temporary)
-            with open(temporary, 'rb') as f:
-                os.fsync(f.fileno())
-            os.replace(temporary, target)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
-    family, weight_role = role.rsplit('_', 1)
+    cover = COVER_ROLES.get(role)
+    if cover:
+        family = cover['family']
+        bold = False
+    else:
+        family, weight_role = role.rsplit('_', 1)
+        bold = weight_role == 'bold'
     record = {
-        'file': rel.as_posix(), 'name': postscript_name or path.stem,
-        'family': 'fallback', 'fallback_family': family, 'bold': weight_role == 'bold',
+        'file': str(path), 'name': postscript_name or path.stem,
+        'family': family if cover else 'fallback', 'bold': bold,
         'section': '', 'priority': -100, 'font_role': role, 'user_supplied': True,
         'sha256': digest, 'weight_class': weight,
     }
+    if cover:
+        record['fontspec_features'] = cover['fontspec_features']
+    else:
+        record['fallback_family'] = family
     if source_face is not None:
         record['source_face'] = source_face
+    warnings = _cover_warnings(role, record['name'], weight) if cover else []
     font_type = type(next(iter(resolver.fonts.values())))
     resolver.fonts[fid] = font_type(fid, record, cmap, [])
-    warnings = []
-    if weight is not None and ((weight_role == 'bold' and weight < 600) or (weight_role == 'regular' and weight >= 600)):
+    if not cover and weight is not None and ((weight_role == 'bold' and weight < 600) or (weight_role == 'regular' and weight >= 600)):
         warnings.append(f'{role}: selected font reports OS/2 weight {weight}; verify that this is the intended face')
     return {'id': fid, 'role': role, 'source_face': source_face,
-            'source': str(path), 'registered_file': rel.as_posix(),
+            'source': str(path),
             'font_name': record['name'], 'sha256': digest, 'unicode_count': len(cmap),
-            'weight_class': weight, 'warnings': warnings}
+            'weight_class': weight, 'fontspec_features': record.get('fontspec_features', []),
+            'warnings': warnings}
 
 
 def _glyph_error(resolver, message):
@@ -207,6 +227,9 @@ def _resolve(resolver, fontid, text, form='normal'):
         if code is not None:
             resolver.resolved_codes.setdefault(candidate.id, set()).add(code)
             return candidate.id, code
+    configured_role = original.record.get('font_role')
+    if configured_role in COVER_ROLES:
+        raise _glyph_error(resolver, f'Configured fonts.{configured_role} does not cover {text!r} with form={form!r}')
     wanted = role or original.record.get('family', 'unknown')
     raise _glyph_error(resolver, f'No glyph covers {text!r} with form={form!r} in font role {wanted}; '
                      f'original font was {fontid} ({source_face}). Configure its matching complete font '
@@ -250,16 +273,19 @@ def install_overrides(resolver, config_path=None, project_root=None):
             raise ValueError(f'Source face {name!r} has incompatible or unsupported font roles: '
                              f'{sorted(str(role) for role in roles)}; '
                              'targeted complete fonts require one mincho/gothic family and weight')
-    registered = [_register(resolver, role, values[role], root) for role in ROLES if values.get(role)]
+    registered = [_register(resolver, role, values[role], root,
+                            fid=COVER_ROLES[role]['id'] if role in COVER_ROLES else None)
+                  for role in ROLES if values.get(role)]
     for index, name in enumerate(sorted(faces), 1):
         if faces[name]:
             role = next(iter(native_faces[name]))
             registered.append(_register(resolver, role, faces[name], root,
                                         fid=f'XF{index:03d}', source_face=name))
     resolver.resolved_codes = {}
-    resolver.resolve = lru_cache(maxsize=None)(lambda fontid, text, form='normal': _resolve(resolver, fontid, text, form))
+    resolver._resolve_impl = lambda fontid, text, form='normal': _resolve(resolver, fontid, text, form)
+    resolver.resolve.cache_clear()
     available = {}
-    for role in ROLES:
+    for role in TEXT_ROLES:
         available[role] = [fid for fid, font in resolver.fonts.items()
                            if font.record.get('family') == 'fallback' and font_role(font.record) == role]
     report = {'schema_version': 1, 'policy': 'native-then-same-face-then-sample-subset-then-targeted-font',
