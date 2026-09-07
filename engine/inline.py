@@ -1,6 +1,7 @@
 """Readable inline markup, ruby clusters, and Japanese line breaking."""
 from dataclasses import dataclass,replace
 import re
+from geometry import CLOZE_BOX
 
 @dataclass
 class Atom:
@@ -11,14 +12,11 @@ class Atom:
     width: float=0
     annotation: str=''
     annotation_span: int=0
+    ruby_parts: tuple=()
 
 OPEN='（([｛{「『【〈《〔'
 CLOSE='、。，．・：；？！ー〜～）)]｝}」』】〉》〕ァィゥェォッャュョぁぃぅぇぉっゃゅょ々'
 # A's measured cloze frames use half-em side spacing, compressed before closing punctuation.
-REFERENCE_BOX_WIDTH=33.75
-REFERENCE_BOX_SUFFIX_WIDTH=11.31
-REFERENCE_BOX_MARGIN=5.655
-REFERENCE_BOX_CLOSING_MARGIN=2.655
 REFERENCE_BOX_CLOSING='、。，．・：；？！）)]｝}」』】〉》'
 REFERENCE_BOX_PATTERN=r'〔([0-9]+)(-[A-Za-z])?〕'
 REFERENCE_BOX_RE=re.compile(REFERENCE_BOX_PATTERN)
@@ -50,7 +48,10 @@ def parse(text,bold=False,underline=False):
         if text[i]=='｜':
             m=re.match(r'｜([^《\n]+)《([^》\n]+)》',text[i:])
             if not m:raise ValueError(f'Invalid ruby markup near {text[i:]!r}')
-            out.append(Atom(m[1],bold,underline,m[2]));i+=len(m[0]);continue
+            parts=tuple(m[2].split('|')) if '|' in m[2] else ()
+            if parts and (len(parts)!=len(m[1]) or not all(parts)):
+                raise ValueError('Partitioned ruby requires one nonempty reading per base character')
+            out.append(Atom(m[1],bold,underline,''.join(parts) if parts else m[2],ruby_parts=parts));i+=len(m[0]);continue
         # A fill-in blank is indivisible; ordinary Latin words also stay together.
         m=TOKEN_RE.match(text,i)
         if m:out.append(Atom(m[0],bold,underline));i+=len(m[0]);continue
@@ -59,17 +60,23 @@ def parse(text,bold=False,underline=False):
 
 def measure(atoms,catalog,size,section=''):
     result=[]
+    prepare=getattr(catalog,'prepare_atoms',None)
+    if prepare:atoms=prepare(atoms)
     for a in atoms:
-        base=sum(catalog.width(c,size,a.bold,section) for c in a.text) if a.text!='\n' else 0
-        ruby=sum(catalog.width(c,size*.5,a.bold,section) for c in a.ruby)
-        if a.underline and a.text=='★':base=max(base,size*3)
         ref=REFERENCE_BOX_RE.fullmatch(a.text)
         if ref and getattr(catalog,'compress_ruby',False):
-            frame=REFERENCE_BOX_WIDTH+(REFERENCE_BOX_SUFFIX_WIDTH if ref[2] else 0)
-            base=(frame+2*REFERENCE_BOX_MARGIN)*size/11.3
+            frame=CLOZE_BOX.frame_width(ref[2])
+            base=(frame+2*CLOZE_BOX.margin)*size/CLOZE_BOX.body_size
+            # Delimiters describe a vector frame, not printed font glyphs.
+            result.append(replace(a,width=base));continue
+        base=sum(catalog.width(c,size,a.bold,section) for c in a.text) if a.text!='\n' else 0
+        adjust_width=getattr(catalog,'atom_width',None)
+        if adjust_width:base=adjust_width(a,base,size,section)
+        ruby=sum(catalog.width(c,size*.5,a.bold,section) for c in a.ruby)
+        if a.underline and a.text=='★':base=max(base,size*3)
         result.append(replace(a,width=base if getattr(catalog,"compress_ruby",False) else max(base,ruby)))
     if getattr(catalog,'compress_ruby',False):
-        reduction=(REFERENCE_BOX_MARGIN-REFERENCE_BOX_CLOSING_MARGIN)*size/11.3
+        reduction=(CLOZE_BOX.margin-CLOZE_BOX.closing_margin)*size/CLOZE_BOX.body_size
         for i in range(len(result)-1):
             if REFERENCE_BOX_RE.fullmatch(result[i].text) and result[i+1].text[:1] in REFERENCE_BOX_CLOSING:
                 result[i]=replace(result[i],width=result[i].width-reduction)

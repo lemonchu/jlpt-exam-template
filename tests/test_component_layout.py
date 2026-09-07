@@ -29,6 +29,7 @@ class ChoiceLayoutDouble(ComponentLayout):
         self.metric_calls+=1
         return {'size':10,'lead':20,'promptlines':[],'prompt_tracking':[],
                 'rigid_blanks':False,'cols':4,'starts':[10,110,210,310],
+                'widths':[(80,90)]*4,
                 'oplines':[[[]],[[]],[[]],[[]]],'row_counts':[1],'total':40}
 
     def ensure(self,height):self.ensure_calls.append(height)
@@ -72,6 +73,19 @@ class ChoiceLayoutTests(unittest.TestCase):
                 atoms=layout.ordering_atoms(source,10)
                 self.assertEqual([(atom.text,atom.underline) for atom in atoms],[('★',True)])
                 self.assertAlmostEqual(atoms[0].width,30)
+
+    def test_paragraph_body_annotation_normalization_respects_section_and_style(self):
+        layout=object.__new__(ComponentLayout)
+        cases=(('R',None,'①__言葉__','{{①|__言葉__}}'),
+               ('R','small','①__言葉__','①__言葉__'),
+               ('G',None,'①__言葉__','①__言葉__'),
+               ('R',None,'{{①|__言葉__}}','{{①|__言葉__}}'))
+        for section,style,text,expected in cases:
+            with self.subTest(section=section,style=style,text=text):
+                layout.section=section
+                block={'type':'paragraph','style':style,'text':text}
+                self.assertEqual(layout.paragraph_body_text(block),expected)
+                self.assertEqual(block['text'],text)
 
 
 if __name__=='__main__':

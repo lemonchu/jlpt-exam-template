@@ -1,5 +1,7 @@
 """Focused tests for build validation, pagination, and artifact helpers."""
 import json
+from contextlib import redirect_stderr
+from io import StringIO
 import sys
 import tempfile
 import unittest
@@ -12,8 +14,55 @@ sys.path.insert(0,str(ROOT/'engine'))
 
 from build import (
     archive_inputs,insert_facing_interleaf,prepare_group,validate_group_config,
-    write_build_outputs,write_scene_inputs,
+    write_build_outputs,write_scene_inputs,parse_args,output_directory,selected_layout_mode,
 )
+
+
+class LayoutModeTests(unittest.TestCase):
+    def test_rules_are_default_and_explicit_alias_is_equivalent(self):
+        default=parse_args([])
+        explicit=parse_args(['--rules'])
+        self.assertEqual(vars(default),vars(explicit))
+        self.assertEqual(default.layout_mode,'rules')
+        self.assertTrue(default.rules)
+        self.assertFalse(default.precise)
+        self.assertFalse(default.recompose)
+        self.assertEqual(output_directory(default),ROOT/'output/rules')
+
+    def test_legacy_modes_require_explicit_flags_and_separate_outputs(self):
+        for mode in ('precise','recompose'):
+            with self.subTest(mode=mode):
+                args=parse_args(['--'+mode])
+                self.assertEqual(selected_layout_mode(args),mode)
+                self.assertFalse(args.rules)
+                self.assertEqual(output_directory(args),ROOT/'output'/mode)
+
+    def test_mode_flags_are_mutually_exclusive(self):
+        for first,second in (('rules','precise'),('rules','recompose'),('precise','recompose')):
+            with self.subTest(first=first,second=second):
+                with redirect_stderr(StringIO()),self.assertRaises(SystemExit):
+                    parse_args(['--'+first,'--'+second])
+
+    def test_output_override_applies_to_all_modes(self):
+        for flag in ([],['--rules'],['--precise'],['--recompose']):
+            args=parse_args([*flag,'--output-dir','custom-output'])
+            self.assertEqual(output_directory(args),Path('custom-output'))
+
+    def test_programmatic_namespace_also_defaults_to_rules(self):
+        self.assertEqual(selected_layout_mode(SimpleNamespace()),'rules')
+        self.assertEqual(selected_layout_mode(SimpleNamespace(rules=False)),'rules')
+        self.assertEqual(selected_layout_mode(SimpleNamespace(precise=True)),'precise')
+        self.assertEqual(selected_layout_mode(SimpleNamespace(recompose=True)),'recompose')
+
+    def test_programmatic_modes_cannot_silently_enter_the_legacy_path(self):
+        with self.assertRaisesRegex(ValueError,'Unknown layout mode'):
+            selected_layout_mode(SimpleNamespace(layout_mode='unexpected'))
+        for args in (SimpleNamespace(precise=True,recompose=True),
+                     SimpleNamespace(rules=True,precise=True),
+                     SimpleNamespace(layout_mode='rules',recompose=True)):
+            with self.subTest(args=args):
+                with self.assertRaisesRegex(ValueError,'mutually exclusive'):
+                    selected_layout_mode(args)
 
 
 class GroupConfigValidationTests(unittest.TestCase):
@@ -70,8 +119,8 @@ class GroupPreparationTests(unittest.TestCase):
         group['items'].pop()
         self.assertEqual(len(self.source['items']),2)
 
-    def test_item_selection_and_recomposition_disable_reused_geometry(self):
-        options={**self.options,'recompose':True,'blueprint_has_header':True}
+    def test_item_selection_disables_body_reuse_but_preserves_compatible_heading(self):
+        options={**self.options,'blueprint_has_header':True}
         group,config=prepare_group(
             self.source,{'id':'V1','items':['q2'],'title':'Custom'},**options,
         )
@@ -79,9 +128,31 @@ class GroupPreparationTests(unittest.TestCase):
         self.assertEqual(group['title'],'Custom')
         self.assertEqual([item['id'] for item in group['items']],['q2'])
         self.assertFalse(config['use_measured'])
-        self.assertFalse(config['_use_measured_heading'])
+        self.assertTrue(config['_use_measured_heading'])
         self.assertFalse(config['_use_measured_example'])
         self.assertTrue(config['_refresh_furniture'])
+
+    def test_forced_legacy_flow_disables_all_measured_fragments(self):
+        _,config=prepare_group(self.source,{'id':'V1'},**{**self.options,'recompose':True})
+        self.assertFalse(config['use_measured'])
+        self.assertFalse(config['_use_measured_heading'])
+        self.assertFalse(config['_use_measured_example'])
+
+    def test_custom_heading_styles_disable_legacy_measured_fragments(self):
+        for setting in ({'heading_size':30},{'instruction_font_size':20}):
+            with self.subTest(setting=setting):
+                _,config=prepare_group(self.source,{'id':'V1',**setting},**self.options)
+                self.assertFalse(config['use_measured'])
+                self.assertFalse(config['_use_measured_heading'])
+                self.assertFalse(config['_use_measured_example'])
+
+    def test_rules_prepare_without_any_body_calibration_contracts(self):
+        options={**self.options,'recompose':True,'canonical_blueprint':None,
+                 'canonical_components':{},'canonical_entries':{},'page_is_canonical':False}
+        group,config=prepare_group(self.source,{'id':'V1','items':['q2']},**options)
+        self.assertEqual([item['id'] for item in group['items']],['q2'])
+        for flag in ('use_measured','_use_measured_heading','_use_measured_example'):
+            self.assertFalse(config[flag])
 
 
 class FacingInterleafTests(unittest.TestCase):
@@ -197,6 +268,8 @@ class BuildArtifactTests(unittest.TestCase):
 
             report=json.loads((out/'build-report.json').read_text())
             self.assertFalse(report['compiled'])
+            self.assertEqual(report['layout_mode'],'rules')
+            self.assertFalse(report['deprecated_layout'])
             self.assertEqual(report['page_count'],2)
             self.assertEqual(list(report['inputs']),['blueprint.yaml'])
             usage=json.loads((out/'composition-font-usage.json').read_text())

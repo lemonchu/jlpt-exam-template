@@ -2,13 +2,13 @@
 
 **用 YAML 编辑题目，用同一套 LaTeX 模板生成接近原稿的 N1 试卷。**
 
-包含 A、B 两套示例题及一套 2014 年 12 月试排，覆盖文字·语彙、文法、読解和听力题册。内容、题型和版式分开保存：既能生成现有示例，也能替换内容、自定义组卷。听力部分不含音频。
+包含 A、B 和 2014 年 12 月三套题库，可生成文字·语彙、文法、読解与听力题册；听力不含音频。题目与版式分开保存，支持替换内容、自定义组卷。
 
-想先了解正式题册的内容与视觉效果，可以查看 [JLPT 官网的《日本語能力試験公式問題集》](https://www.jlpt.jp/samples/sampleindex.html)。本项目是独立模板，与 JLPT 官方无关联。
+先看效果：[仓库示例 PDF](https://github.com/lemonchu/jlpt-exam-template/tree/main/examples) · [JLPT 官方样板](https://www.jlpt.jp/samples/sampleindex.html)。本项目与 JLPT 官方无关联；仓库示例是保留的旧版展示快照，不代表最新规则版输出。
 
 ## 快速开始
 
-安装 **Python 3.10+** 和带有 XeLaTeX 的 **TeX Live / MacTeX**，然后运行：
+安装 **Python 3.10+** 和带有 XeLaTeX 的 **TeX Live / MacTeX**，然后安装项目依赖：
 
 ```bash
 git clone https://github.com/lemonchu/jlpt-exam-template.git
@@ -16,35 +16,48 @@ cd jlpt-exam-template
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r requirements.txt
+```
+
+按[字体说明](docs/FONTS.md)配置 `fonts.yaml`，然后构建。**仓库仅附带字体子集，即使处理 A/B 也可能需要完整字体**，例如 A 文字卷的「謎」；缺字会报错，不会自动换字体。
+
+```bash
 python3 build.py --paper paper-a --booklet written
 ```
 
-PDF 输出到 `output/N1-paper-a-written.pdf`。将 `paper-a` 改为 `paper-b` 可生成另一套题；将 `written` 改为 `listening` 可生成听力题册。
+输出：`output/rules/N1-paper-a-written.pdf`。换成 `--paper paper-b` 或 `--booklet listening` 可构建另一题库或听力卷；`--fonts /path/to/my-fonts.yaml` 可指定独立字体配置。
 
-**现有 A/B 两套题可直接编译，无需另找字体。** 项目保留原版旧字形子集，并附上现有题目需要的少量补充字形；不改用其他字体，也不提供完整版字体。
+2014 试卷需要额外字体和文字卷蓝图，构建命令见 [2014 说明](content/paper-2014-12/README.md)。
 
-`examples/` 中的 2014 年 12 月成品可以直接查看；若要重新构建，则需自行配置 Ryumin、FutoGo B101、Gothic MB101 Pro R，以及 New Century Schoolbook Roman（或 C059 Roman）。详见 [2014 试排说明](content/paper-2014-12/README.md) 和 [字体说明](docs/FONTS.md)。
+## 编辑与组卷
 
-## 如何命题
+| 想做什么 | 从哪里改 |
+| --- | --- |
+| 改题目、注音、选项 | `content/<题库>/`；另起一套可复制为 `content/my-exam/`，用 `--paper my-exam` 构建 |
+| 调整选题、编号、分页 | `blueprints/`；用 `--blueprint 路径` 指定 |
+| 添加可选年份、圆圈 A/B | 元数据中的封面字段；不填则不显示 |
+| 放入广告、图表 | YAML 引用独立 PDF、PNG 或 JPEG |
 
-- **改题目**：编辑 `content/paper-a/` 或 `content/paper-b/` 中的 YAML。另起一套时复制为 `content/my-exam/`，构建时使用 `--paper my-exam`。
-- **改组卷**：编辑 `blueprints/`，调整题组、选题、编号和纸张边侧的分区标记。
-- **标注封面**：可在元数据中选填年份场次和圆圈题册符号；不填时保持原封面。
-- **放广告或图表**：复杂材料可保存为独立 PDF、PNG 或 JPEG，由 YAML 引用；题干和选项仍是可编辑文字。
+入门见[内容指南](docs/CONTENT-GUIDE.md)，完整字段见 [YAML 参考](docs/SCHEMA.md)。
 
-字段与示例见 [内容指南](https://github.com/lemonchu/jlpt-exam-template/blob/main/docs/CONTENT-GUIDE.md) 和 [YAML 参考](https://github.com/lemonchu/jlpt-exam-template/blob/main/docs/SCHEMA.md)。生成效果也可直接查看 [`examples/`](https://github.com/lemonchu/jlpt-exam-template/tree/main/examples) 中的 6 份 PDF，包含 A、B、2014 年 12 月三套试卷各自的文字卷与听力卷。
+## 排版模式
 
-## 字体与精度
+默认由共享规则排正文，封面和固定排序示范使用独立模板，不套用旧 A 正文坐标。修改内容后，断行与页数可以变化；不承诺与原稿逐像素相同。
 
-内置子集只覆盖已有内容。写入未收录的新字时，需要在 `fonts.yaml` 中配置对应的完整字体：Ryumin、FutoGo B101、ShinGo 或 Gothic MB101。若启用可选封面年份与 A/B 标号，还需配置其 Gothic MB101 Pro R 与 New Century Schoolbook/C059 字体。缺字会明确报错，不会悄悄换字体。
+| 模式 | 行为 | 默认输出目录 |
+| --- | --- | --- |
+| 无参数或 `--rules` | 当前规则排版 | `output/rules/` |
+| `--precise`（已弃用） | 旧精确兼容路径；不兼容时回退旧流排 | `output/precise/` |
+| `--recompose`（已弃用） | 旧流排，供迁移对照 | `output/recompose/` |
 
-可自行在 [ufonts.com](https://ufonts.com/) 按名称寻找。**非广告、无赞助、无返佣**；该站仅作为查找线索，请核对字体版本及许可。具体名称和配置见 [字体说明](https://github.com/lemonchu/jlpt-exam-template/blob/main/docs/FONTS.md)。
+模式参数互斥；`--output-dir 路径` 可覆盖输出目录。旧版默认行为现在需显式加 `--precise`，仅供回归对照。构建不会更新 `examples/`。规则与限制见[排版规则](docs/RULE-LAYOUT.md)。
 
-原稿已有字形保留原轮廓；补充字形取自对应的现代字体版本，局部可能与旧版不同。超出精确组件兼容条件的内容或组卷修改会重新排版，断行和页数也可能变化。
+## 开发与测试
 
-构建时会自动选择版式：文字容量、行内标记、内容布局属性和页面配置都与校准组件兼容时，复用其精确位置；任一条件不兼容时，该题组自动改用规则排版。`--recompose` 可强制全卷仅用规则排版，适合检查自定义内容的流式分页；它追求同一视觉规范，但不保证与参考 PDF 逐坐标一致。
+```bash
+python3 -m unittest discover -s tests
+```
 
-修改构建引擎后，可运行 `python3 -m unittest discover -s tests` 执行全套单元测试（目前 61 项）。重新生成 A 的文字卷和听力卷后，运行 `python3 tests/verify_examples.py` 可逐页核对这两份示例的渲染像素。
+模块职责、PDF 回归与原稿对照方法见[维护参考](docs/ARCHITECTURE.md)。
 
 ## 许可
 
