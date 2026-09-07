@@ -12,7 +12,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'engine'))
 
-from component_layout import ComponentLayout
+from legacy_layout import LegacyLayout
 from rule_layout import RuleLayout
 from test_written_rules import Catalog
 
@@ -146,7 +146,7 @@ class SamePageGroupTests(unittest.TestCase):
         self.assertEqual(layout.page, before)
 
     def test_legacy_mode_rejects_unsafe_continuation_before_replacing_a_page(self):
-        layout = self.layout(ComponentLayout)
+        layout = self.layout(LegacyLayout)
         config = {'use_measured': False, '_use_measured_heading': False, 'sidebar': False}
         layout.render_group(self.group(), config)
         original = deepcopy(layout.page)

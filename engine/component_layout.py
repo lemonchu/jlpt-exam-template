@@ -1,10 +1,9 @@
-"""N1 components using the same measured typography for arbitrary semantic text."""
+"""Shared N1 composition and drawing; no legacy body-coordinate reuse."""
 from dataclasses import replace
 import re,copy
 from inline import parse,plain,measure,OPEN,CLOSE,REFERENCE_BOX_RE
 from geometry import CHOICE,CLOZE_BOX,body_grid,metric,require_number
 from material_primitives import MaterialPrimitives
-from semantic_bindings import CalibrationMismatch,iter_questions
 from page_furniture import decorate
 
 _FULLWIDTH_DIGITS=str.maketrans('0123456789','０１２３４５６７８９')
@@ -20,9 +19,6 @@ class ComponentLayout(MaterialPrimitives):
         self.left,self.width=body_grid(self.section).geometry(self.n(),self.p)
     def page_left(self,page_number):
         return body_grid(self.section).left(page_number,self.p)
-    def measured_geometry_compatible(self):
-        """Whether a measured fragment still fits the canonical A page grid."""
-        return body_grid(self.section).matches(self)
     def _is_cloze(self):
         return bool(self.section=='G' and self.group and self.group.get('kind')=='cloze')
     def _uses_reading_spacing(self):
@@ -627,15 +623,11 @@ class ComponentLayout(MaterialPrimitives):
         if item.get('label'):self.reading_item_label(str(item['label']))
         for question in questions:self.choice(question)
         if len(self.pages)!=left_index:raise ValueError('Facing-page questions exceed the left page; shorten them or use ordinary reading layout')
-        self.new_page();right_index=len(self.pages)
-        if self.gc.get('use_measured') and self.group['id'] in self.reference.components:
-            try:
-                page=self.reference.take_page(self.group,self.reference.components[self.group['id']]['pages'][-1],self.n(),self.gc.get('_refresh_furniture',False))
-                if page.get('measured_body'):page['bands']=[copy.deepcopy(self.gc['sidebar'])] if self.gc.get('sidebar') else []
-                self.pages[-1]=page;self.page=page;self.y=self.bottom
-                self.component_audit[-1]['shared_reference_page']=True
-                return
-            except CalibrationMismatch:pass
+        self.new_page()
+        self.reference_material(stimulus)
+    def reference_material(self,stimulus):
+        """Compose the right-hand material of a facing spread on one page."""
+        right_index=len(self.pages)
         size,leading=self.fs,self.leading
         self.fs=float(self.gc.get('reference_font_size',9.2));self.leading=float(self.gc.get('reference_line_height',13.68))
         outset=metric(self.gc,'reference_outset',16.95,allow_zero=True)
@@ -768,54 +760,22 @@ class ComponentLayout(MaterialPrimitives):
     def template_example(self,item):
         return False
     def begin_group(self,group,config):
-        """Legacy groups retain their page-start contract; rules override flow."""
-        if not config.get('new_page',True) and self.page is not None and self.page['commands']:
-            raise ValueError('Same-page groups require the default rules mode; remove --precise/--recompose')
         if config.get('new_page',True) or self.page is None:self.new_page()
         else:self.add_band()
     def group_heading(self,group,config):
-        try:
-            if not config.get('_use_measured_heading',True) or not self.measured_geometry_compatible():
-                raise CalibrationMismatch('Heading geometry changed')
-            commands,spec=self.reference.heading(group,self.left)
-            self.page['commands']+=commands;self.page['_ink']=None
-            if self.section=='L':
-                if group['kind']=='listening_memo':self.y=spec['first_item_baseline']-25.1744
-                else:self.y=spec['first_item_baseline']+18.8077-20
-            elif group['kind'] in ('choice','word_order'):self.y=spec['first_item_baseline']+.828-self.fs
-            else:self.y=spec['first_item_baseline']-self.fs
-        except CalibrationMismatch:
-            if self.section=='L':self._listening_heading(group,config)
-            else:self.dynamic_heading(group,config)
+        self.dynamic_heading(group,config)
+    def group_opening(self,group,config):
+        """Draw the heading and return the number of items already rendered."""
+        self.group_heading(group,config)
+        return 0
     def render_group(self,group,config):
         self.group=group;self.gc=config;self.section=group['id'][0];self.group_number=int(config.get('number_start',1));self.fs=float(config.get('font_size',self.p['font_size']));self.leading=float(config.get('line_height',self.p['line_height']));self.facing_started=False
         self.begin_group(group,config)
-        start=len(self.pages);ref=self.reference;can_measure=config.get('use_measured',True)
-        # The same component resolver is called for every content set.
-        if can_measure:
-            try:
-                current=ref.take_group(group,self.n(),config.get('_refresh_furniture',False))
-                for page in current:
-                    if page.get('measured_body'):
-                        side=config.get('sidebar')
-                        page['bands']=[copy.deepcopy(side)] if side else []
-                self.pages.pop();self.pages.extend(current);self.page=self.pages[-1];self.geometry();self.y=self.bottom
-                self.component_audit.append({'group':group['id'],'placement':'measured','body_pages':list(range(start,len(self.pages)+1))})
-                self.number+=sum(1 for _ in iter_questions(group))
-                return
-            except CalibrationMismatch as e:reason=str(e)
-        else:reason='Custom composition configuration'
+        self.compose_group(group,config)
+    def compose_group(self,group,config,*,reason='Custom composition configuration'):
         items=group.get('items',[])
-        self.component_audit.append({'group':group['id'],'placement':'composed','reason':reason,'first_body_page':start})
-        skip=0
-        if can_measure and group['kind']=='listening_choice' and items and items[0].get('is_example'):
-            try:
-                page=ref.take_page(group,ref.components[group['id']]['pages'][0],self.n())
-                self.pages[-1]=page;self.page=page;skip=1;self.y=self.bottom
-                self.item_records.append({'id':items[0]['id'],'source_number':None,'label':'例','pages':[len(self.pages)],'options':4})
-                self.component_audit[-1]['shared_intro_page']=True
-            except CalibrationMismatch:pass
-        if not skip:self.group_heading(group,config)
+        self.component_audit.append({'group':group['id'],'placement':'composed','reason':reason,'first_body_page':len(self.pages)})
+        skip=self.group_opening(group,config)
         body_start_adjust=require_number(config.get('body_start_adjust',0),'body_start_adjust must be a number')
         if self.y+body_start_adjust<self.top or self.y+body_start_adjust>self.bottom:
             raise ValueError('body_start_adjust places content outside the usable page')
@@ -824,25 +784,14 @@ class ComponentLayout(MaterialPrimitives):
         for idx,item in enumerate(items[skip:],skip):
             self._first_group_item=(idx==0)
             if idx:self._split_group_opening=False
-            if self.template_example(item):
-                self.item_records.append({'id':item['id'],'source_number':None,'label':item.get('label','例'),'pages':[len(self.pages)],'options':4})
-                continue
-            if (can_measure
-                    and group['kind']=='word_order' and item.get('is_example')
-                    and config.get('_use_measured_example',True) and abs(body_start_adjust)<1e-9):
-                try:
-                    # The worked example is stable page furniture. Reuse it
-                    # whenever its own semantic shape still matches, even if
-                    # the surrounding questions are being recomposed.
-                    if not self.measured_geometry_compatible():raise CalibrationMismatch('Example geometry changed')
-                    commands,baseline=ref.slice_item(group,idx,self.n(),self.left)
-                    self.page['commands']+=commands;self.page['_ink']=None;self.y=baseline-self.fs
-                    self.component_audit[-1]['shared_example_component']=True
-                    self.item_records.append({'id':item['id'],'source_number':None,'label':item.get('label','例'),'pages':[len(self.pages)],'options':4})
-                    continue
-                except CalibrationMismatch:pass
-            if group['kind'] in ('choice','word_order','listening_choice'):self.choice(item)
-            else:self.passage(item)
+            self.render_item(item,idx)
+    def render_item(self,item,index):
+        if self.template_example(item):
+            self.record_example(item)
+        elif self.group['kind'] in ('choice','word_order','listening_choice'):self.choice(item)
+        else:self.passage(item)
+    def record_example(self,item):
+        self.item_records.append({'id':item['id'],'source_number':None,'label':item.get('label','例'),'pages':[len(self.pages)],'options':4})
     def dynamic_heading(self,group,config):
         title=config.get('title',group.get('title',''));instruction=group.get('instruction','')
         if self.section=='L':return self._listening_heading(group,config)
