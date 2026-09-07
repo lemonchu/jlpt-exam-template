@@ -1,5 +1,6 @@
 """Fast contracts for the calibrated renderer's orchestration helpers."""
 import json
+import os
 import shutil
 import stat
 import sys
@@ -158,7 +159,9 @@ class ProjectWritingTests(unittest.TestCase):
             )
             self.assertEqual((out/'n1-exact.sty').read_text(),'style\n')
             self.assertEqual((out/'fonts.tex').read_text(),'font definitions\n')
-            self.assertTrue((out/'build.sh').stat().st_mode & stat.S_IXUSR)
+            self.assertTrue((out/'build.sh').is_file())
+            if os.name!='nt':
+                self.assertTrue((out/'build.sh').stat().st_mode & stat.S_IXUSR)
 
 
 class CompilationTests(unittest.TestCase):

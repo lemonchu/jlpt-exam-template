@@ -148,7 +148,7 @@ groups:
 | `page_number_start` | 默认1；插入空白页计入输出页序 |
 | `items_per_page` | 听力每内容页题数，正整数，默认2；例题默认独立 |
 | `passages_new_page` | 是否每篇阅读另起页 |
-| `questions_new_page` | 材料之后是否另起题页；完形默认 `true` |
+| `questions_new_page` | 材料之后是否另起题页；完形默认 `true`。规则版完形材料已跨页时，题目从材料末页续排；其他题型和旧模式仍按此设置换页 |
 | `material_line_height` | 文章行距；G7默认19.8，正式选择题仍为24.05996 |
 | `heading_layout` | 听力使用 `stacked` |
 | `heading_size`、`instruction_font_size`、`instruction_line_height`、`instruction_width` | 标题与说明尺寸；说明宽度不可超过版心 |

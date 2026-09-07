@@ -28,6 +28,18 @@ python3 build.py --paper paper-a --booklet written
 
 2014 试卷需要额外字体和文字卷蓝图，构建命令见 [2014 说明](content/paper-2014-12/README.md)。
 
+## Windows / Conda
+
+安装 Conda 和 TeX Live，确保 `xelatex`、`xdvipdfmx` 在 PATH 中。在 Conda 终端的仓库根目录执行：
+
+```powershell
+conda env create -f environment.yml
+conda activate jlpt-exam
+python build.py --paper paper-b --booklet written
+```
+
+字体配置同上；已有环境只需激活。
+
 ## 编辑与组卷
 
 | 想做什么 | 从哪里改 |

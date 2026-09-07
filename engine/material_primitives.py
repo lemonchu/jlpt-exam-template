@@ -80,8 +80,8 @@ class MaterialPrimitives:
         src=(self.resources/'assets'/rel).resolve()
         if not src.is_relative_to((self.resources/'assets').resolve()) or not src.is_file():raise FileNotFoundError(f'Asset unavailable: {name}')
         target=Path('assets')/rel;dest=self.out/target;dest.parent.mkdir(parents=True,exist_ok=True)
-        if str(target) not in self.assets:
-            shutil.copyfile(src,dest);self.assets.add(str(target))
+        if target.as_posix() not in self.assets:
+            shutil.copyfile(src,dest);self.assets.add(target.as_posix())
         return target.as_posix()
 
     def image_geometry(self,b,width):

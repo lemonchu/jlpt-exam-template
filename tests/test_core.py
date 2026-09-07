@@ -62,7 +62,7 @@ class FontConfigurationTests(unittest.TestCase):
     def test_enabled_cover_reports_missing_role(self):
         profile=ROOT/'profiles/n1-original'
         reference=ReferenceComponents(profile,ROOT/'content/paper-2014-12/metadata.yaml')
-        reference.fonts=ComponentFonts(profile,ROOT/'fonts.yaml',ROOT)
+        reference.fonts=ComponentFonts(profile,None,ROOT)
         with self.assertRaisesRegex(ValueError,r'fonts\.cover_session'):
             reference._cover_marks('written')
 

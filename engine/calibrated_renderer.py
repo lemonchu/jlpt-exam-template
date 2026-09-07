@@ -218,10 +218,14 @@ def _compile_project(out,page_count):
     if not pdf.read_bytes().rstrip().endswith(b'%%EOF'):raise RuntimeError('Incomplete generated PDF')
     with fitz.open(pdf) as document:
         if document.is_repaired or len(document)!=page_count:raise RuntimeError('PDF page count/xref validation failed')
-    with pdf.open('rb') as stream:os.fsync(stream.fileno())
-    os.replace(pdf,out/'main.pdf');fd=os.open(out,os.O_RDONLY)
-    try:os.fsync(fd)
-    finally:os.close(fd)
+    # Windows requires a writable file handle for fsync and cannot open a
+    # directory through os.open. Keep the directory durability step on POSIX.
+    with pdf.open('r+b') as stream:os.fsync(stream.fileno())
+    os.replace(pdf,out/'main.pdf')
+    if os.name!='nt':
+        fd=os.open(out,os.O_RDONLY)
+        try:os.fsync(fd)
+        finally:os.close(fd)
 
 def _build_report(inputs,pages,state,resolver,font_policy):
     report={'status':'PASS','backend':'component-scene','pages':len(pages),'sections':inputs.sections,'resolved_runs':state.run_count,'resolved_slots':state.slot_count,'drawn_glyphs':state.drawn,'font_count':len(resolver.used),'fallback_events':resolver.fallback_events,'unbound_required_runs':[],'content_source':'resolved.runs only','layout_text_fallback':False}

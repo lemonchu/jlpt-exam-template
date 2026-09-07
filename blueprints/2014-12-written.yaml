@@ -35,10 +35,6 @@ groups:
     - 0.11
     - 0.295
 - id: G7
-  body_start_adjust: -9.93
-  material_intro_line_height: 19.8
-  material_box_top_padding: 8
-  material_box_bottom_padding: 0
 - id: R8
   options_columns: 1
 - id: R9
