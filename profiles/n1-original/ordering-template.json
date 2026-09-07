@@ -1,0 +1,1502 @@
+{
+  "schema_version": 1,
+  "description": "Reusable N1 ordering instructions and worked-example furniture. Local field slots, not a page replay. Coordinates are top-left bp relative to each component origin.",
+  "style": {
+    "font_size": 11.3,
+    "line_height": 24.05996,
+    "body_width": 452.41,
+    "heading_size": 12.8,
+    "instruction_font_size": 11.3
+  },
+  "ink": [
+    0.13725,
+    0.12157,
+    0.12549
+  ],
+  "stroke": 0.33,
+  "heading": {
+    "content": {
+      "title": "問題６",
+      "instruction": "次の文の__★__に入る最もよいものを、１・２・３・４から一つ選びなさい。"
+    },
+    "advance": 63.1081,
+    "fields": {
+      "/title#base": {
+        "pointer": "/title",
+        "role": "base"
+      },
+      "/instruction#base": {
+        "pointer": "/instruction",
+        "role": "base"
+      }
+    },
+    "runs": [
+      {
+        "font": "G007",
+        "sx": 12.8,
+        "sy": 12.8,
+        "x": 0.0,
+        "y": 12.6201,
+        "offsets": [
+          0.0,
+          12.81024,
+          25.62048
+        ],
+        "slots": [
+          [
+            "/title#base",
+            0
+          ],
+          [
+            "/title#base",
+            1
+          ],
+          [
+            "/title#base",
+            2
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 50.88,
+        "y": 11.3,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051
+        ],
+        "slots": [
+          [
+            "/instruction#base",
+            0
+          ],
+          [
+            "/instruction#base",
+            1
+          ],
+          [
+            "/instruction#base",
+            2
+          ],
+          [
+            "/instruction#base",
+            3
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 107.42972,
+        "y": 11.3,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/instruction#base",
+            4
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 130.05006,
+        "y": 11.3,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          45.24068,
+          56.55085,
+          67.86102,
+          79.17119,
+          90.48136,
+          101.79153,
+          113.1017,
+          124.41187,
+          135.72204,
+          147.03221,
+          158.34238,
+          169.65255,
+          180.96272,
+          192.27289,
+          203.58306,
+          214.89323,
+          226.2034,
+          237.51357,
+          248.82374,
+          260.13391,
+          271.44408,
+          282.75425,
+          294.06442,
+          305.37459
+        ],
+        "slots": [
+          [
+            "/instruction#base",
+            5
+          ],
+          [
+            "/instruction#base",
+            6
+          ],
+          [
+            "/instruction#base",
+            7
+          ],
+          [
+            "/instruction#base",
+            8
+          ],
+          [
+            "/instruction#base",
+            9
+          ],
+          [
+            "/instruction#base",
+            10
+          ],
+          [
+            "/instruction#base",
+            11
+          ],
+          [
+            "/instruction#base",
+            12
+          ],
+          [
+            "/instruction#base",
+            13
+          ],
+          [
+            "/instruction#base",
+            14
+          ],
+          [
+            "/instruction#base",
+            15
+          ],
+          [
+            "/instruction#base",
+            16
+          ],
+          [
+            "/instruction#base",
+            17
+          ],
+          [
+            "/instruction#base",
+            18
+          ],
+          [
+            "/instruction#base",
+            19
+          ],
+          [
+            "/instruction#base",
+            20
+          ],
+          [
+            "/instruction#base",
+            21
+          ],
+          [
+            "/instruction#base",
+            22
+          ],
+          [
+            "/instruction#base",
+            23
+          ],
+          [
+            "/instruction#base",
+            24
+          ],
+          [
+            "/instruction#base",
+            25
+          ],
+          [
+            "/instruction#base",
+            26
+          ],
+          [
+            "/instruction#base",
+            27
+          ],
+          [
+            "/instruction#base",
+            28
+          ],
+          [
+            "/instruction#base",
+            29
+          ],
+          [
+            "/instruction#base",
+            30
+          ],
+          [
+            "/instruction#base",
+            31
+          ],
+          [
+            "/instruction#base",
+            32
+          ]
+        ]
+      }
+    ],
+    "lines": [
+      [
+        96.099,
+        14.3152,
+        130.085,
+        14.3152
+      ]
+    ]
+  },
+  "example": {
+    "content": {
+      "is_example": true,
+      "label": "（問題例）",
+      "prompt": "あそこで __　　　__ __　　　__ __★__ __　　　__ は｜山田《やま|だ》さんです。",
+      "options": [
+        "テレビ",
+        "見ている",
+        "を",
+        "人"
+      ],
+      "stimulus_position": "after_options",
+      "stimulus": [
+        {
+          "type": "heading",
+          "text": "（解答のしかた）"
+        },
+        {
+          "type": "paragraph",
+          "style": "bold",
+          "text": "１．正しい文はこうです。"
+        },
+        {
+          "type": "box",
+          "blocks": [
+            {
+              "type": "table",
+              "header_rows": 0,
+              "borders": false,
+              "rows": [
+                [
+                  "あそこで",
+                  "__　　　__",
+                  "__　　　__",
+                  "__★__",
+                  "__　　　__",
+                  "は｜山田《やま|だ》さんです。"
+                ],
+                [
+                  "",
+                  "１　テレビ",
+                  "３　を",
+                  "２　見ている",
+                  "４　人",
+                  ""
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "bold",
+          "text": "２．__★__に入る番号を解答用紙にマークします。"
+        },
+        {
+          "type": "paragraph",
+          "text": "（解答用紙）"
+        },
+        {
+          "type": "table",
+          "header_rows": 0,
+          "width": 135,
+          "align": "center",
+          "column_widths": [
+            0.35,
+            0.65
+          ],
+          "rows": [
+            [
+              "（例）",
+              "①　●　③　④"
+            ]
+          ]
+        }
+      ]
+    },
+    "advance": 358.6619,
+    "fields": {
+      "/label#base": {
+        "pointer": "/label",
+        "role": "base"
+      },
+      "/prompt#ruby": {
+        "pointer": "/prompt",
+        "role": "ruby"
+      },
+      "/prompt#base": {
+        "pointer": "/prompt",
+        "role": "base"
+      },
+      "/stimulus/2/blocks/0/rows/1/1#base": {
+        "pointer": "/stimulus/2/blocks/0/rows/1/1",
+        "role": "base"
+      },
+      "/stimulus/2/blocks/0/rows/1/3#base": {
+        "pointer": "/stimulus/2/blocks/0/rows/1/3",
+        "role": "base"
+      },
+      "/stimulus/2/blocks/0/rows/1/2#base": {
+        "pointer": "/stimulus/2/blocks/0/rows/1/2",
+        "role": "base"
+      },
+      "/stimulus/2/blocks/0/rows/1/4#base": {
+        "pointer": "/stimulus/2/blocks/0/rows/1/4",
+        "role": "base"
+      },
+      "/stimulus/0/text#base": {
+        "pointer": "/stimulus/0/text",
+        "role": "base"
+      },
+      "/stimulus/1/text#base": {
+        "pointer": "/stimulus/1/text",
+        "role": "base"
+      },
+      "/stimulus/2/blocks/0/rows/0/5#ruby": {
+        "pointer": "/stimulus/2/blocks/0/rows/0/5",
+        "role": "ruby"
+      },
+      "/stimulus/2/blocks/0/rows/0/0#base": {
+        "pointer": "/stimulus/2/blocks/0/rows/0/0",
+        "role": "base"
+      },
+      "/stimulus/2/blocks/0/rows/0/3#base": {
+        "pointer": "/stimulus/2/blocks/0/rows/0/3",
+        "role": "base"
+      },
+      "/stimulus/2/blocks/0/rows/0/5#base": {
+        "pointer": "/stimulus/2/blocks/0/rows/0/5",
+        "role": "base"
+      },
+      "/options/0/label#base": {
+        "pointer": "/options/0/label",
+        "role": "base",
+        "option_number": 1
+      },
+      "/options/0#base": {
+        "pointer": "/options/0",
+        "role": "base"
+      },
+      "/options/2/label#base": {
+        "pointer": "/options/2/label",
+        "role": "base",
+        "option_number": 3
+      },
+      "/options/2#base": {
+        "pointer": "/options/2",
+        "role": "base"
+      },
+      "/options/1/label#base": {
+        "pointer": "/options/1/label",
+        "role": "base",
+        "option_number": 2
+      },
+      "/options/1#base": {
+        "pointer": "/options/1",
+        "role": "base"
+      },
+      "/options/3/label#base": {
+        "pointer": "/options/3/label",
+        "role": "base",
+        "option_number": 4
+      },
+      "/options/3#base": {
+        "pointer": "/options/3",
+        "role": "base"
+      },
+      "/stimulus/3/text#base": {
+        "pointer": "/stimulus/3/text",
+        "role": "base"
+      },
+      "/stimulus/5/rows/0/0#base": {
+        "pointer": "/stimulus/5/rows/0/0",
+        "role": "base"
+      },
+      "/stimulus/5/rows/0/1#base": {
+        "pointer": "/stimulus/5/rows/0/1",
+        "role": "base"
+      },
+      "/stimulus/4/text#base": {
+        "pointer": "/stimulus/4/text",
+        "role": "base"
+      }
+    },
+    "runs": [
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 0.0,
+        "y": 10.472,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          45.24068
+        ],
+        "slots": [
+          [
+            "/label#base",
+            0
+          ],
+          [
+            "/label#base",
+            1
+          ],
+          [
+            "/label#base",
+            2
+          ],
+          [
+            "/label#base",
+            3
+          ],
+          [
+            "/label#base",
+            4
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 5.6,
+        "sy": 5.6,
+        "x": 277.14,
+        "y": 22.4996,
+        "offsets": [
+          0.0,
+          5.57984,
+          14.09968
+        ],
+        "slots": [
+          [
+            "/prompt#ruby",
+            0
+          ],
+          [
+            "/prompt#ruby",
+            1
+          ],
+          [
+            "/prompt#ruby",
+            2
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 28.26,
+        "y": 33.122,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          158.34012,
+          237.51018,
+          248.82035,
+          260.13052,
+          271.44069,
+          282.75086,
+          294.06103,
+          305.3712,
+          316.68137
+        ],
+        "slots": [
+          [
+            "/prompt#base",
+            0
+          ],
+          [
+            "/prompt#base",
+            1
+          ],
+          [
+            "/prompt#base",
+            2
+          ],
+          [
+            "/prompt#base",
+            3
+          ],
+          [
+            "/prompt#base",
+            4
+          ],
+          [
+            "/prompt#base",
+            5
+          ],
+          [
+            "/prompt#base",
+            6
+          ],
+          [
+            "/prompt#base",
+            7
+          ],
+          [
+            "/prompt#base",
+            8
+          ],
+          [
+            "/prompt#base",
+            9
+          ],
+          [
+            "/prompt#base",
+            10
+          ],
+          [
+            "/prompt#base",
+            11
+          ],
+          [
+            "/prompt#base",
+            12
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 39.57017,
+        "y": 57.18196,
+        "offsets": [
+          0.0,
+          22.62034,
+          33.93051,
+          45.24068,
+          101.7904,
+          124.41074,
+          135.72091,
+          147.03108,
+          158.34125,
+          203.5808,
+          226.20114,
+          305.3712,
+          327.99154
+        ],
+        "slots": [
+          [
+            "/stimulus/2/blocks/0/rows/1/1#base",
+            0
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/1#base",
+            1
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/1#base",
+            2
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/1#base",
+            3
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/3#base",
+            0
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/3#base",
+            1
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/3#base",
+            2
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/3#base",
+            3
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/3#base",
+            4
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/2#base",
+            0
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/2#base",
+            1
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/4#base",
+            0
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/1/4#base",
+            1
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": -0.00017,
+        "y": 105.30188,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          45.24068,
+          56.55085,
+          67.86102,
+          79.17119
+        ],
+        "slots": [
+          [
+            "/stimulus/0/text#base",
+            0
+          ],
+          [
+            "/stimulus/0/text#base",
+            1
+          ],
+          [
+            "/stimulus/0/text#base",
+            2
+          ],
+          [
+            "/stimulus/0/text#base",
+            3
+          ],
+          [
+            "/stimulus/0/text#base",
+            4
+          ],
+          [
+            "/stimulus/0/text#base",
+            5
+          ],
+          [
+            "/stimulus/0/text#base",
+            6
+          ],
+          [
+            "/stimulus/0/text#base",
+            7
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 11.31,
+        "y": 129.36184,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          45.24068,
+          56.55085,
+          67.86102,
+          79.17119,
+          90.48136,
+          101.79153,
+          113.1017,
+          124.41187
+        ],
+        "slots": [
+          [
+            "/stimulus/1/text#base",
+            0
+          ],
+          [
+            "/stimulus/1/text#base",
+            1
+          ],
+          [
+            "/stimulus/1/text#base",
+            2
+          ],
+          [
+            "/stimulus/1/text#base",
+            3
+          ],
+          [
+            "/stimulus/1/text#base",
+            4
+          ],
+          [
+            "/stimulus/1/text#base",
+            5
+          ],
+          [
+            "/stimulus/1/text#base",
+            6
+          ],
+          [
+            "/stimulus/1/text#base",
+            7
+          ],
+          [
+            "/stimulus/1/text#base",
+            8
+          ],
+          [
+            "/stimulus/1/text#base",
+            9
+          ],
+          [
+            "/stimulus/1/text#base",
+            10
+          ],
+          [
+            "/stimulus/1/text#base",
+            11
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 5.6,
+        "sy": 5.6,
+        "x": 361.98,
+        "y": 166.8595,
+        "offsets": [
+          0.0,
+          5.57984,
+          14.09968
+        ],
+        "slots": [
+          [
+            "/stimulus/2/blocks/0/rows/0/5#ruby",
+            0
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#ruby",
+            1
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#ruby",
+            2
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 22.62,
+        "y": 177.482,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051
+        ],
+        "slots": [
+          [
+            "/stimulus/2/blocks/0/rows/0/0#base",
+            0
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/0#base",
+            1
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/0#base",
+            2
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/0#base",
+            3
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 237.50984,
+        "y": 177.482,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/stimulus/2/blocks/0/rows/0/3#base",
+            0
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 350.60928,
+        "y": 177.482,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          45.24068,
+          56.55085,
+          67.86102,
+          79.17119
+        ],
+        "slots": [
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            0
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            1
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            2
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            3
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            4
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            5
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            6
+          ],
+          [
+            "/stimulus/2/blocks/0/rows/0/5#base",
+            7
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 79.16972,
+        "y": 201.54196,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/options/0/label#base",
+            0,
+            "fullwidth"
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 101.79006,
+        "y": 201.54196,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034
+        ],
+        "slots": [
+          [
+            "/options/0#base",
+            0
+          ],
+          [
+            "/options/0#base",
+            1
+          ],
+          [
+            "/options/0#base",
+            2
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 158.33978,
+        "y": 201.54196,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/options/2/label#base",
+            0,
+            "fullwidth"
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 180.96012,
+        "y": 201.54196,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/options/2#base",
+            0
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 209.22029,
+        "y": 201.54196,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/options/1/label#base",
+            0,
+            "fullwidth"
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 231.84063,
+        "y": 201.54196,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051
+        ],
+        "slots": [
+          [
+            "/options/1#base",
+            0
+          ],
+          [
+            "/options/1#base",
+            1
+          ],
+          [
+            "/options/1#base",
+            2
+          ],
+          [
+            "/options/1#base",
+            3
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 294.06069,
+        "y": 201.54196,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/options/3/label#base",
+            0,
+            "fullwidth"
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 316.68103,
+        "y": 201.54196,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/options/3#base",
+            0
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 11.31096,
+        "y": 262.38229,
+        "offsets": [
+          0.0,
+          11.31017
+        ],
+        "slots": [
+          [
+            "/stimulus/3/text#base",
+            0
+          ],
+          [
+            "/stimulus/3/text#base",
+            1
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 45.24147,
+        "y": 262.38229,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/stimulus/3/text#base",
+            2
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 67.86181,
+        "y": 262.38229,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          45.24068,
+          56.55085,
+          67.86102,
+          79.17119,
+          90.48136,
+          101.79153,
+          113.1017,
+          124.41187,
+          135.72204,
+          147.03221,
+          158.34238,
+          169.65255,
+          180.96272,
+          192.27289
+        ],
+        "slots": [
+          [
+            "/stimulus/3/text#base",
+            3
+          ],
+          [
+            "/stimulus/3/text#base",
+            4
+          ],
+          [
+            "/stimulus/3/text#base",
+            5
+          ],
+          [
+            "/stimulus/3/text#base",
+            6
+          ],
+          [
+            "/stimulus/3/text#base",
+            7
+          ],
+          [
+            "/stimulus/3/text#base",
+            8
+          ],
+          [
+            "/stimulus/3/text#base",
+            9
+          ],
+          [
+            "/stimulus/3/text#base",
+            10
+          ],
+          [
+            "/stimulus/3/text#base",
+            11
+          ],
+          [
+            "/stimulus/3/text#base",
+            12
+          ],
+          [
+            "/stimulus/3/text#base",
+            13
+          ],
+          [
+            "/stimulus/3/text#base",
+            14
+          ],
+          [
+            "/stimulus/3/text#base",
+            15
+          ],
+          [
+            "/stimulus/3/text#base",
+            16
+          ],
+          [
+            "/stimulus/3/text#base",
+            17
+          ],
+          [
+            "/stimulus/3/text#base",
+            18
+          ],
+          [
+            "/stimulus/3/text#base",
+            19
+          ],
+          [
+            "/stimulus/3/text#base",
+            20
+          ]
+        ]
+      },
+      {
+        "font": "G007",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 204.12,
+        "y": 286.4119,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034
+        ],
+        "slots": [
+          [
+            "/stimulus/5/rows/0/0#base",
+            0
+          ],
+          [
+            "/stimulus/5/rows/0/0#base",
+            1
+          ],
+          [
+            "/stimulus/5/rows/0/0#base",
+            2
+          ]
+        ]
+      },
+      {
+        "font": "G003",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 248.07022,
+        "y": 286.4119,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/stimulus/5/rows/0/1#base",
+            0,
+            "ring"
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 7.92,
+        "sy": 9.9,
+        "x": 249.75,
+        "y": 285.5911,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/stimulus/5/rows/0/1#base",
+            0,
+            "fullwidth"
+          ]
+        ]
+      },
+      {
+        "font": "G003",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 270.72,
+        "y": 286.4119,
+        "offsets": [
+          0.0,
+          22.64972
+        ],
+        "slots": [
+          [
+            "/stimulus/5/rows/0/1#base",
+            1
+          ],
+          [
+            "/stimulus/5/rows/0/1#base",
+            2,
+            "ring"
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 7.92,
+        "sy": 9.9,
+        "x": 295.05,
+        "y": 285.5911,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/stimulus/5/rows/0/1#base",
+            2,
+            "fullwidth"
+          ]
+        ]
+      },
+      {
+        "font": "G003",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 316.02,
+        "y": 286.4119,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/stimulus/5/rows/0/1#base",
+            3,
+            "ring"
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 7.92,
+        "sy": 9.9,
+        "x": 317.7,
+        "y": 285.5911,
+        "offsets": [
+          0.0
+        ],
+        "slots": [
+          [
+            "/stimulus/5/rows/0/1#base",
+            3,
+            "fullwidth"
+          ]
+        ]
+      },
+      {
+        "font": "G009",
+        "sx": 11.3,
+        "sy": 11.3,
+        "x": 113.1,
+        "y": 286.4419,
+        "offsets": [
+          0.0,
+          11.31017,
+          22.62034,
+          33.93051,
+          45.24068,
+          56.55085
+        ],
+        "slots": [
+          [
+            "/stimulus/4/text#base",
+            0
+          ],
+          [
+            "/stimulus/4/text#base",
+            1
+          ],
+          [
+            "/stimulus/4/text#base",
+            2
+          ],
+          [
+            "/stimulus/4/text#base",
+            3
+          ],
+          [
+            "/stimulus/4/text#base",
+            4
+          ],
+          [
+            "/stimulus/4/text#base",
+            5
+          ]
+        ]
+      }
+    ],
+    "lines": [
+      [
+        84.79,
+        36.1281,
+        118.776,
+        36.1281
+      ],
+      [
+        130.026,
+        36.1281,
+        164.012,
+        36.1281
+      ],
+      [
+        175.262,
+        36.1281,
+        209.248,
+        36.1281
+      ],
+      [
+        220.498,
+        36.1281,
+        254.484,
+        36.1281
+      ],
+      [
+        79.15,
+        180.4881,
+        135.754,
+        180.4881
+      ],
+      [
+        147.004,
+        180.4881,
+        203.608,
+        180.4881
+      ],
+      [
+        214.858,
+        180.4881,
+        271.462,
+        180.4881
+      ],
+      [
+        282.712,
+        180.4881,
+        339.316,
+        180.4881
+      ],
+      [
+        33.913,
+        265.3801,
+        67.899,
+        265.3801
+      ],
+      [
+        -0.042,
+        -10.8199,
+        452.438,
+        -10.8199
+      ],
+      [
+        333.058,
+        270.7541,
+        333.058,
+        293.4901
+      ],
+      [
+        242.349,
+        270.7541,
+        242.349,
+        293.4901
+      ],
+      [
+        333.058,
+        270.7541,
+        333.058,
+        293.4901
+      ],
+      [
+        199.83,
+        270.7541,
+        199.83,
+        293.4901
+      ],
+      [
+        199.653,
+        293.4611,
+        333.265,
+        293.4611
+      ],
+      [
+        199.653,
+        293.4611,
+        333.265,
+        293.4611
+      ],
+      [
+        199.653,
+        270.7841,
+        333.265,
+        270.7841
+      ],
+      [
+        -0.042,
+        314.0121,
+        452.438,
+        314.0121
+      ]
+    ],
+    "rectangles": [
+      [
+        11.296,
+        142.0441,
+        441.112,
+        84.921
+      ]
+    ]
+  }
+}

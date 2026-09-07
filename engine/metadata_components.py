@@ -470,17 +470,19 @@ def _reflow(field_name, field, rows, metadata, metrics, regions, page_width, att
     return commands, resolved, audit
 
 
-def resolve_metadata_components(profile, metadata_path, commands, fonts, body_pages=None):
+def resolve_metadata_components(profile, metadata_path, commands, fonts, body_pages=None, *, template=None):
     """Return (new_commands, resolved_runs, audit) for one page's commands.
 
     `fonts` accepts ComponentFonts or an already-configured Resolver. Metadata
     glyphs on a page are replaced only when that semantic field changes capacity.
     Non-metadata commands are left alone. No original PDF/content is consulted.
+    A preloaded cover template supplies bindings, paper and fit regions without
+    reading the legacy all-body layout or metadata binding files.
     """
     profile = Path(profile)
     metadata_path = Path(metadata_path)
-    bindings_path = profile / 'metadata-bindings.json'
-    bindings = json.loads(bindings_path.read_text())
+    bindings = (template['bindings'] if template is not None
+                else json.loads((profile / 'metadata-bindings.json').read_text()))
     metadata = load_metadata(metadata_path, bindings, body_pages)
     by_field = _field_runs(commands, bindings)
     for booklet in ('written', 'listening'):
@@ -505,21 +507,26 @@ def resolve_metadata_components(profile, metadata_path, commands, fonts, body_pa
     replacements = {}
     remove = set()
     audits = []
-    layout = json.loads((profile / 'layout.json').read_text()) if changes else None
-    regions = _regions(layout, bindings) if changes else {}
+    paper = None
+    regions = {}
+    if changes:
+        if template is not None:
+            paper, regions = template['paper'], template['regions']
+        else:
+            layout = json.loads((profile / 'layout.json').read_text())
+            paper, regions = layout['paper'], _regions(layout, bindings)
     rectangles = _rectangles(commands) if changes else []
     removed_boxes = []
     for field_name, reason in changes:
         rows = by_field[field_name]
         attached_boxes = _attached_boxes(rows, metrics, rectangles)
-        cc, rr, aa = _reflow(field_name, bindings['fields'][field_name], rows, metadata, metrics, regions, layout['paper']['width'], attached_boxes)
+        cc, rr, aa = _reflow(field_name, bindings['fields'][field_name], rows, metadata, metrics, regions, paper['width'], attached_boxes)
         removed_boxes.extend(box for _, box in attached_boxes)
         replacements[rows[0][0]] = cc
         remove.update(index for index, _, _ in rows)
         resolved.update(rr)
         aa['reason'] = reason
         audits.append(aa)
-    paper = layout['paper'] if layout is not None else None
     for index, command in enumerate(commands):
         if index in replacements:
             output.extend(replacements[index])

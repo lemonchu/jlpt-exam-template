@@ -8882,7 +8882,7 @@
       "role": "base",
       "generator": null,
       "shape": {
-        "base_count": 125,
+        "base_count": 127,
         "ruby": [],
         "styles": [],
         "whitespace": [],
@@ -8894,10 +8894,18 @@
           [
             3,
             "〕"
+          ],
+          [
+            108,
+            "―"
+          ],
+          [
+            109,
+            "―"
           ]
         ]
       },
-      "count": 125
+      "count": 127
     },
     "G:/groups/2/items/0/stimulus/1/blocks/9/text#base": {
       "file": "G.yaml",
@@ -65443,7 +65451,7 @@
           "refs": [
             {
               "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 120,
+              "char": 122,
               "part": 0
             }
           ],
@@ -65453,7 +65461,7 @@
           "refs": [
             {
               "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 121,
+              "char": 123,
               "part": 0
             }
           ],
@@ -65473,7 +65481,7 @@
           "refs": [
             {
               "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 123,
+              "char": 125,
               "part": 0
             }
           ],
@@ -66477,26 +66485,6 @@
           "refs": [
             {
               "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 108,
-              "part": 0
-            }
-          ],
-          "formatter": "identity"
-        },
-        {
-          "refs": [
-            {
-              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 109,
-              "part": 0
-            }
-          ],
-          "formatter": "identity"
-        },
-        {
-          "refs": [
-            {
-              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
               "char": 110,
               "part": 0
             }
@@ -66518,6 +66506,26 @@
             {
               "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
               "char": 112,
+              "part": 0
+            }
+          ],
+          "formatter": "identity"
+        },
+        {
+          "refs": [
+            {
+              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
+              "char": 113,
+              "part": 0
+            }
+          ],
+          "formatter": "identity"
+        },
+        {
+          "refs": [
+            {
+              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
+              "char": 114,
               "part": 0
             }
           ],
@@ -66551,7 +66559,7 @@
           "refs": [
             {
               "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 122,
+              "char": 124,
               "part": 0
             }
           ],
@@ -66571,26 +66579,6 @@
     },
     "G-p05-r54": {
       "glyphs": [
-        {
-          "refs": [
-            {
-              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 113,
-              "part": 0
-            }
-          ],
-          "formatter": "identity"
-        },
-        {
-          "refs": [
-            {
-              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 114,
-              "part": 0
-            }
-          ],
-          "formatter": "identity"
-        },
         {
           "refs": [
             {
@@ -66645,7 +66633,27 @@
           "refs": [
             {
               "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
-              "char": 124,
+              "char": 120,
+              "part": 0
+            }
+          ],
+          "formatter": "identity"
+        },
+        {
+          "refs": [
+            {
+              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
+              "char": 121,
+              "part": 0
+            }
+          ],
+          "formatter": "identity"
+        },
+        {
+          "refs": [
+            {
+              "field": "G:/groups/2/items/0/stimulus/1/blocks/8/text#base",
+              "char": 126,
               "part": 0
             }
           ],

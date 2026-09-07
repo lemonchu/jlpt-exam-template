@@ -129,60 +129,85 @@ class BlueprintValidationTests(unittest.TestCase):
 
 
 class AssetResolutionTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.resources = self.root / "resources"
+        self.output = self.root / "output"
+        self.resources.mkdir()
+        self.output.mkdir()
+        self.layout = SimpleNamespace(assets=set())
+        root_patch = patch.object(build, "ROOT", self.root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+
+    def resolve(self, bindings, metadata=None, content_files=None, *, slots):
+        pages = [{"commands": [{"type": "image", "asset": slot} for slot in slots]}]
+        return build.resolve_assets(bindings, metadata or {}, content_files or {},
+                                    self.layout, self.output, pages)
+
     def test_metadata_content_and_generated_assets_are_resolved(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            resources = root / "resources"
-            profile = root / "profile"
-            output = root / "output"
-            resources.mkdir()
-            profile.mkdir()
-            (resources / "front.pdf").write_bytes(b"front")
-            (resources / "question.png").write_bytes(b"question")
-            bindings = {
-                "front": {"metadata_pointer": "/assets/front"},
-                "question": {"file": "R.yaml", "pointer": "/groups/0/asset"},
-                "missing-file": {"file": "missing.yaml", "pointer": "/asset"},
-                "missing-key": {"file": "R.yaml", "pointer": "/groups/0/missing"},
-                "absent-resource": {"metadata_pointer": "/assets/absent"},
-                "generated": {"metadata_pointer": "/assets/front"},
-            }
-            (profile / "asset-bindings.json").write_text(json.dumps(bindings), encoding="utf-8")
-            metadata = {"assets": {"front": "front.pdf", "absent": "not-there.pdf"}}
-            content_files = {"R.yaml": {"groups": [{"asset": "question.png"}]}}
-            layout = SimpleNamespace(assets={"generated", "layout-only"})
+        (self.resources / "front.pdf").write_bytes(b"front")
+        (self.resources / "question.png").write_bytes(b"question")
+        for asset in ("generated", "layout-only"):
+            (self.output / asset).write_bytes(b"generated")
+        bindings = {
+            "front": {"metadata_pointer": "/assets/front"},
+            "question": {"file": "R.yaml", "pointer": "/groups/0/asset"},
+            "missing-file": {"file": "missing.yaml", "pointer": "/asset"},
+            "missing-key": {"file": "R.yaml", "pointer": "/groups/0/missing"},
+            "absent-resource": {"metadata_pointer": "/assets/absent"},
+            "unsafe": {"metadata_pointer": "/assets/unsafe"},
+            "generated": {"metadata_pointer": "/assets/missing"},
+        }
+        metadata = {"assets": {"front": "front.pdf", "absent": "not-there.pdf",
+                               "unsafe": "../secret.pdf"}}
+        content_files = {"R.yaml": {"groups": [{"asset": "question.png"}]}}
+        self.layout.assets = {"generated", "layout-only", "unreferenced-missing"}
 
-            with patch.object(build, "ROOT", root):
-                assets = build.resolve_assets(profile, metadata, content_files, layout, output)
+        assets = self.resolve(bindings, metadata, content_files,
+                              slots=("front", "question", "generated", "layout-only", "front"))
 
-            self.assertEqual(assets["front"], str((resources / "front.pdf").resolve()))
-            self.assertEqual(assets["question"], str((resources / "question.png").resolve()))
-            self.assertNotIn("missing-file", assets)
-            self.assertNotIn("missing-key", assets)
-            self.assertNotIn("absent-resource", assets)
-            self.assertEqual(assets["generated"], str(output / "generated"))
-            self.assertEqual(assets["layout-only"], str(output / "layout-only"))
+        self.assertEqual(assets, {
+            "front": str((self.resources / "front.pdf").resolve()),
+            "question": str((self.resources / "question.png").resolve()),
+            "generated": str((self.output / "generated").resolve()),
+            "layout-only": str((self.output / "layout-only").resolve()),
+        })
 
     def test_asset_paths_cannot_escape_resources(self):
         for unsafe_name in ("../secret.pdf", "/tmp/secret.pdf"):
             with self.subTest(unsafe_name=unsafe_name):
-                with tempfile.TemporaryDirectory() as directory:
-                    root = Path(directory)
-                    profile = root / "profile"
-                    (root / "resources").mkdir()
-                    profile.mkdir()
-                    (profile / "asset-bindings.json").write_text(json.dumps({
-                        "unsafe": {"metadata_pointer": "/assets/file"},
-                    }), encoding="utf-8")
-                    with patch.object(build, "ROOT", root):
-                        with self.assertRaisesRegex(ValueError, "Unsafe asset path"):
-                            build.resolve_assets(
-                                profile,
-                                {"assets": {"file": unsafe_name}},
-                                {},
-                                SimpleNamespace(assets=set()),
-                                root / "output",
-                            )
+                with self.assertRaisesRegex(ValueError, "Unsafe asset path"):
+                    self.resolve({"unsafe": {"metadata_pointer": "/assets/file"}},
+                                 {"assets": {"file": unsafe_name}}, slots=("unsafe",))
+
+    def test_referenced_missing_bindings_and_files_fail_clearly(self):
+        cases = (
+            ({}, {}, {}, ValueError, "Missing asset binding"),
+            ({"metadata_pointer": "/missing"}, {}, {}, ValueError, "Cannot resolve asset binding"),
+            ({"file": "missing.yaml", "pointer": "/asset"}, {}, {},
+             ValueError, "Cannot resolve asset binding"),
+            ({"file": "R.yaml", "pointer": "/missing"}, {}, {"R.yaml": {}},
+             ValueError, "Cannot resolve asset binding"),
+            ({"metadata_pointer": "/asset"}, {"asset": "absent.png"}, {},
+             FileNotFoundError, "Current image asset is missing"),
+        )
+        for binding, metadata, documents, error, message in cases:
+            with self.subTest(binding=binding), self.assertRaisesRegex(error, message):
+                self.resolve({"current": binding} if binding else {}, metadata, documents,
+                             slots=("current",))
+
+    def test_generated_assets_must_exist_inside_the_output_directory(self):
+        for asset, error, message in (
+            ("missing.png", FileNotFoundError, "Current image asset is missing"),
+            ("../secret.pdf", ValueError, "Unsafe generated asset path"),
+            ("/tmp/secret.pdf", ValueError, "Unsafe generated asset path"),
+        ):
+            with self.subTest(asset=asset), self.assertRaisesRegex(error, message):
+                self.layout.assets = {asset}
+                self.resolve({}, slots=(asset,))
 
 
 class _FakeReferenceComponents:
@@ -193,6 +218,7 @@ class _FakeReferenceComponents:
         self.ledger = []
         self.metadata_audit = {}
         self.fonts = None
+        self.asset_bindings = {}
 
     def cover(self, section, body_pages):
         return []
