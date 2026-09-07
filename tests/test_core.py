@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT/'engine'))
 
-from build import canonicalize_config,renumber_group,select_items,validate_blueprint
+from build import renumber_group,select_items,validate_blueprint
 from calibrated_renderer import Font,Resolver
 from component_fonts import ComponentFonts
 from font_overrides import COVER_ROLES,_config,_cover_warnings,_validate_tex_path
@@ -83,9 +83,6 @@ class FontConfigurationTests(unittest.TestCase):
 
 
 class BuildPlannerTests(unittest.TestCase):
-    def test_contract_config_normalizes_yaml_integer_keys(self):
-        self.assertEqual(canonicalize_config({'columns':{6:[1,2]}}),{'columns':{'6':[1,2]}})
-
     def test_non_a4_blueprint_fails_before_layout(self):
         blueprint={'groups':[],'page':{'width':612,'height':792}}
         with self.assertRaisesRegex(ValueError,'supports only 595 x 842'):

@@ -4,7 +4,7 @@
 
 包含 A、B 和 2014 年 12 月三套题库，可生成文字·语彙、文法、読解与听力题册；听力不含音频。题目与版式分开保存，支持替换内容、自定义组卷。
 
-先看效果：[仓库示例 PDF](https://github.com/lemonchu/jlpt-exam-template/tree/main/examples) · [JLPT 官方样板](https://www.jlpt.jp/samples/sampleindex.html)。本项目与 JLPT 官方无关联；仓库示例是保留的旧版展示快照，不代表最新规则版输出。
+先看效果：[仓库示例 PDF](https://github.com/lemonchu/jlpt-exam-template/tree/main/examples) · [JLPT 官方样板](https://www.jlpt.jp/samples/sampleindex.html)。六份仓库示例由默认规则版生成；本项目与 JLPT 官方无关联。
 
 ## 快速开始
 

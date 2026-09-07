@@ -3,6 +3,7 @@ from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -17,6 +18,13 @@ import build
 
 
 class DefaultBuildTests(unittest.TestCase):
+    def test_imports_work_without_legacy_modules(self):
+        result = subprocess.run([sys.executable, '-c',
+            "import sys; sys.modules.update(legacy_layout=None, reference_components=None); "
+            "import build; from rule_layout import RuleLayout"],
+            cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_real_default_build_does_not_read_legacy_body_profiles(self):
         """Exercise templates, actual fonts, page flow and scene rendering, not a mock layout."""
         forbidden = {
@@ -52,6 +60,8 @@ class DefaultBuildTests(unittest.TestCase):
                 item['id'] for item in groups['G6']['items'][:2]
             ]}]
             blueprint['components_file'] = str(ROOT / 'blueprints/components.yaml')
+            blueprint['group_defaults'].update(use_measured=True, _use_measured_heading=True,
+                                               _use_measured_example=True)
             blueprint_path = temporary / 'blueprint.yaml'
             blueprint_path.write_text(yaml.safe_dump(blueprint), encoding='utf-8')
             args = build.parse_args([
@@ -62,6 +72,7 @@ class DefaultBuildTests(unittest.TestCase):
             with patch.object(build, 'parse_args', return_value=args), \
                     patch.object(build, 'load_content', return_value=(groups, documents)), \
                     patch.object(Path, 'read_text', read_text), \
+                    patch.dict(sys.modules, legacy_layout=None, reference_components=None), \
                     redirect_stdout(stdout), redirect_stderr(stderr):
                 build.main()
             project = temporary / 'out/paper-a-written'
@@ -84,6 +95,7 @@ class DefaultBuildTests(unittest.TestCase):
             with patch.object(build, 'parse_args', return_value=args), \
                     patch.object(build, 'load_content', return_value=(groups, documents)), \
                     patch.object(Path, 'read_text', read_text), \
+                    patch.dict(sys.modules, legacy_layout=None, reference_components=None), \
                     redirect_stdout(StringIO()), redirect_stderr(stderr):
                 build.main()
             self.assertEqual(previous_pdf.read_bytes(), b'previous PDF fixture')

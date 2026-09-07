@@ -31,10 +31,9 @@ class SamePageBuildTests(unittest.TestCase):
         }
         layout = RuleLayout(Catalog(), blueprint, ROOT / 'resources', directory.name, reference)
         build.compose_groups(
-            blueprint=blueprint, groups=groups, component_defaults={}, contracts=None,
-            layout=layout, reference=reference,
+            blueprint=blueprint, groups=groups, component_defaults={}, layout=layout,
             metadata=build.load(ROOT / 'content/common/metadata.yaml'),
-            booklet='written', recompose=True, pristine=False, blueprint_has_header=False)
+            booklet='written')
         return layout
 
     def test_continuation_on_current_right_page_does_not_insert_blank_pages(self):
