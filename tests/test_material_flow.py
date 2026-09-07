@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_reading_rules import FlowProbe
-from component_layout import ComponentLayout
 
 
 class NoteFlowTests(unittest.TestCase):
@@ -75,14 +74,6 @@ class NoteFlowTests(unittest.TestCase):
         flow.blocks([self.note(number=i) for i in range(1, 4)])
         self.assertEqual({row[0] for row in flow.drawn}, {2})
 
-    def test_legacy_note_policy_still_keeps_the_whole_list(self):
-        flow = self.flow()
-        flow.y = flow.bottom - 40
-        flow.reading_notes = lambda notes, x, width: ComponentLayout.reading_notes(flow, notes, x, width)
-        flow.blocks([self.note(number=i) for i in range(1, 4)])
-        self.assertEqual({row[0] for row in flow.drawn}, {2})
-
-
 class MaterialQuestionFlowTests(unittest.TestCase):
     def flow(self, kind='cloze'):
         flow = FlowProbe()
@@ -143,13 +134,6 @@ class MaterialQuestionFlowTests(unittest.TestCase):
         flow._first_group_item = False
         flow.passage(self.passage(1))
         self.assertEqual(flow.question_pages, [2, 4])
-
-    def test_legacy_cloze_keeps_its_forced_answer_page(self):
-        flow = self.flow()
-        flow.break_before_questions = lambda page: ComponentLayout.break_before_questions(flow, page)
-        flow.passage(self.passage(5))
-        self.assertEqual(flow.question_pages, [3])
-
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render all measured slots exclusively from caller-supplied semantic text."""
+"""Render a generated scene using caller-supplied semantic text."""
 import argparse,json,os,re,shutil,subprocess,sys
 from dataclasses import dataclass,field
 from pathlib import Path
@@ -140,7 +140,7 @@ def _load_inputs(args):
     out.mkdir(parents=True,exist_ok=True)
     (out/'render-report.json').unlink(missing_ok=True)
     if not args.compile:(out/'main.pdf').unlink(missing_ok=True)
-    layout=json.loads(Path(getattr(args,'scene',None) or resources/'layout.json').read_text());resolved=json.loads(Path(args.resolved).read_text())
+    layout=json.loads(Path(args.scene).read_text());resolved=json.loads(Path(args.resolved).read_text())
     if resolved.get('schema_version')!=1:raise ValueError('Unsupported resolved schema version')
     bindings=resolved.get('runs')
     if not isinstance(bindings,dict):raise ValueError('resolved.runs must be a mapping keyed by run_id')

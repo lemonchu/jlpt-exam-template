@@ -41,7 +41,7 @@ def load_ordering_template(profile):
 
 
 class OrderingTemplates:
-    """Optional hooks used only by RuleLayout; precise composition is unchanged."""
+    """Fixed heading and example hooks for RuleLayout."""
 
     def _ordering_asset(self):
         return load_ordering_template(self.reference.profile)

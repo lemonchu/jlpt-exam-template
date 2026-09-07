@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate exams with N1 layout rules and fixed templates; legacy precision is opt-in."""
+"""Generate exams with N1 layout rules and fixed templates."""
 from pathlib import Path
 from argparse import ArgumentParser,Namespace
 import json,copy,re,shutil,sys,hashlib
@@ -14,7 +14,6 @@ GROUP_BOOLEAN_FIELDS=(
 )
 BOOKLET_SECTIONS={'written':{'V','G','R'},'listening':{'L'}}
 sys.path.insert(0,str(ROOT/'engine'))
-from component_fonts import ComponentFonts
 from calibrated_renderer import render
 from semantic_bindings import iter_questions,pointer
 from geometry import PAPER_WIDTH,PAPER_HEIGHT,require_number
@@ -79,36 +78,16 @@ def parse_args(argv=None):
     parser.add_argument('--fonts',type=Path,default=ROOT/'fonts.yaml' if (ROOT/'fonts.yaml').is_file() else None,
                         help='Complete-font configuration; defaults to project fonts.yaml when present')
     parser.add_argument('--no-compile',action='store_true')
-    mode=parser.add_mutually_exclusive_group()
-    mode.add_argument('--rules',dest='layout_mode',action='store_const',const='rules',
-                      help='Use the default generation rules and independent fixed templates')
-    mode.add_argument('--precise',dest='layout_mode',action='store_const',const='precise',
-                      help='Deprecated: reuse compatible A-calibrated body components, otherwise use legacy flow')
-    mode.add_argument('--recompose',dest='layout_mode',action='store_const',const='recompose',
-                      help='Deprecated: force the old flowing layout, for migration comparisons only')
-    parser.set_defaults(layout_mode='rules')
+    parser.add_argument('--rules',action='store_true',default=True,
+                        help='Use the default layout rules (optional alias)')
     parser.add_argument('--output-dir',type=Path,
-                        help='Output root; defaults to output/rules, output/precise, or output/recompose by mode')
+                        help='Output root; defaults to output/rules')
     args=parser.parse_args(argv)
     if not re.fullmatch(r'[A-Za-z0-9_-]+',args.paper):parser.error('Invalid paper folder name')
-    args.rules=args.layout_mode=='rules'
-    args.precise=args.layout_mode=='precise'
-    args.recompose=args.layout_mode=='recompose'
     return args
 
-def selected_layout_mode(args):
-    """Default to rules, including callers that construct their own Namespace."""
-    modes={'rules','precise','recompose'}
-    selected={mode for mode in modes if getattr(args,mode,False)}
-    explicit=getattr(args,'layout_mode',None)
-    if explicit is not None:
-        if explicit not in modes:raise ValueError(f'Unknown layout mode: {explicit!r}')
-        selected.add(explicit)
-    if len(selected)>1:raise ValueError('Layout modes are mutually exclusive')
-    return next(iter(selected),'rules')
-
 def output_directory(args):
-    return getattr(args,'output_dir',None) or ROOT/'output'/selected_layout_mode(args)
+    return getattr(args,'output_dir',None) or ROOT/'output/rules'
 
 def load_content(content):
     groups={};documents={}
@@ -217,16 +196,15 @@ def use_group_layout(layout,group,config):
     """Make a group current before inserting a page outside render_group()."""
     layout.section=group['id'][0];layout.group=group;layout.gc=config
 
-def insert_facing_interleaf(layout,metadata,group,config,*,legacy=None):
-    """Align a facing spread; old reference-page handling is opt-in."""
+def insert_facing_interleaf(layout,metadata,group,config):
+    """Align a facing spread using the current interleaf asset."""
     if config.get('layout')!='facing_pages' or starts_on(layout,'left'):return
     use_group_layout(layout,group,config)
-    if legacy is not None and legacy.insert_interleaf(layout,group):return
     layout.new_page()
     asset=metadata['assets'].get('reading_interleaf')
     if asset:layout.image({'asset':asset,'width':452.41,'height':708.96},layout.left,layout.width)
 
-def compose_groups(*,blueprint,groups,component_defaults,layout,metadata,booklet,legacy=None):
+def compose_groups(*,blueprint,groups,component_defaults,layout,metadata,booklet):
     """Compose the blueprint's ordered groups and return their selected content."""
     default_numbering=blueprint.get('numbering',{}).get('mode','continuous')
     selected=set();selected_data=[]
@@ -240,19 +218,18 @@ def compose_groups(*,blueprint,groups,component_defaults,layout,metadata,booklet
             groups[group_id],entry,blueprint=blueprint,
             component_defaults=component_defaults,
         )
-        if legacy is not None:legacy.configure_group(group,entry,config)
         if group_id in selected:raise ValueError('Duplicate group selection: '+group_id)
         start_on=config.get('start_on')
-        same_page_rules=legacy is None and config.get('new_page',True) is False
-        if start_on and not same_page_rules and not starts_on(layout,start_on):
+        same_page=config.get('new_page',True) is False
+        if start_on and not same_page and not starts_on(layout,start_on):
             use_group_layout(layout,group,config);layout.new_page()
         if config.get('sidebar',blueprint.get('sidebar')) is not False:
             config['sidebar']={
                 'text':metadata['sections'][group_id[0]]['sidebar_label'],
                 **(blueprint.get('sidebar') or {}),**(config.get('sidebar') or {}),
             }
-        if not same_page_rules:
-            insert_facing_interleaf(layout,metadata,group,config,legacy=legacy)
+        if not same_page:
+            insert_facing_interleaf(layout,metadata,group,config)
         group=renumber_group(group,config,default_numbering,layout.number)
         layout.render_group(group,config)
         selected.add(group_id);selected_data.append(group)
@@ -299,8 +276,7 @@ def write_build_outputs(*,out,args,body_pages,pages,layout,reference,fonts,input
     report={
         'status':'BUILT','paper':args.paper,'booklet':args.booklet,
         'renderer':'shared-component-scene','body_pages':body_pages,
-        'layout_mode':selected_layout_mode(args),
-        'deprecated_layout':selected_layout_mode(args)!='rules',
+        'layout_mode':'rules',
         'page_count':len(pages),'original_pdf_read_at_build_time':False,
         'content_origin':'current YAML only','components':layout.component_audit,
         'compiled':not args.no_compile,
@@ -327,10 +303,6 @@ def write_build_outputs(*,out,args,body_pages,pages,layout,reference,fonts,input
 
 def main():
     args=parse_args()
-    layout_mode=selected_layout_mode(args)
-    if layout_mode!='rules':
-        print(f'Warning: --{layout_mode} is deprecated and retained for legacy comparisons. '
-              'Omit it to use the default rules layout.',file=sys.stderr)
     content=ROOT/'content'/args.paper;bp_path=args.blueprint or ROOT/'blueprints'/f'{args.booklet}.yaml'
     bp=validate_blueprint(require_schema_v1(load(bp_path),bp_path),bp_path)
     metadata_path=args.metadata or (content/'metadata.yaml' if (content/'metadata.yaml').exists() else ROOT/'content/common/metadata.yaml');metadata=require_schema_v1(load(metadata_path),metadata_path)
@@ -340,19 +312,10 @@ def main():
     component_data=load(component_path) if component_path else None
     component_defaults=component_data.get('components',{}) if component_data else {}
     profile=ROOT/'profiles/n1-original'
-    if layout_mode=='rules':
-        from cover_templates import CoverTemplates
-        from rule_layout import RuleLayout
-        from rule_typography import RuleFonts
-        ref=CoverTemplates(profile,metadata_path)
-        layout_type=RuleLayout;font_type=RuleFonts
-        legacy=None
-    else:
-        from legacy_layout import LegacyLayout,LegacyPolicy
-        from reference_components import ReferenceComponents
-        ref=ReferenceComponents(profile,metadata_path)
-        layout_type=LegacyLayout;font_type=ComponentFonts
-        legacy=LegacyPolicy(ref,bp,component_data,args.booklet,recompose=layout_mode!='precise')
+    from cover_templates import CoverTemplates
+    from rule_layout import RuleLayout
+    from rule_typography import RuleFonts
+    ref=CoverTemplates(profile,metadata_path)
     bp.setdefault('header',metadata['booklets'][args.booklet]['subject_ja'])
     output_root=output_directory(args)
     out=output_root/f'{args.paper}-{args.booklet}';out.mkdir(parents=True,exist_ok=True)
@@ -360,10 +323,10 @@ def main():
     if args.no_compile and previous_pdf.is_file():
         print(f'Warning: --no-compile will not update the existing PDF: {previous_pdf}',file=sys.stderr)
     for generated_dir in ('assets','licenses'):shutil.rmtree(out/generated_dir,ignore_errors=True)
-    fonts=font_type(profile,args.fonts,ROOT);ref.fonts=fonts;layout=layout_type(fonts,bp,ROOT/'resources',out,ref)
+    fonts=RuleFonts(profile,args.fonts,ROOT);ref.fonts=fonts;layout=RuleLayout(fonts,bp,ROOT/'resources',out,ref)
     selected_data=compose_groups(
         blueprint=bp,groups=groups,component_defaults=component_defaults,
-        layout=layout,metadata=metadata,booklet=args.booklet,legacy=legacy,
+        layout=layout,metadata=metadata,booklet=args.booklet,
     )
     body_pages=len(layout.pages)
     covers=ref.cover('L' if args.booklet=='listening' else 'V',body_pages) if bp.get('cover',True) else []

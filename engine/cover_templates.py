@@ -100,7 +100,7 @@ class CoverTemplates:
         for index, page in enumerate(pages):
             if self.fonts is not None:
                 page['commands'], runs, audit = resolve_metadata_components(
-                    self.profile, self.metadata_path, page['commands'], self.fonts,
+                    self.metadata_path, page['commands'], self.fonts,
                     body_pages=body_pages, template=self.cover_template,
                 )
                 self.metadata_audit.append(audit)

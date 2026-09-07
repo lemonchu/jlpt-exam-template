@@ -1,9 +1,8 @@
-"""The public default must work without the deprecated body calibration data."""
+"""Real builds use current profile resources and preserve preview behavior."""
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import json
 from pathlib import Path
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,27 +17,16 @@ import build
 
 
 class DefaultBuildTests(unittest.TestCase):
-    def test_imports_work_without_legacy_modules(self):
-        result = subprocess.run([sys.executable, '-c',
-            "import sys; sys.modules.update(legacy_layout=None, reference_components=None); "
-            "import build; from rule_layout import RuleLayout"],
-            cwd=ROOT, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_real_default_build_does_not_read_legacy_body_profiles(self):
+    def test_real_build_uses_only_current_profile_resources(self):
         """Exercise templates, actual fonts, page flow and scene rendering, not a mock layout."""
-        forbidden = {
-            'layout.json', 'body-bindings.json', 'components.json',
-            'composition-contracts.json', 'glyph-capacities.json',
-            'asset-bindings.json',
-        }
+        allowed = {'cover-template.json', 'ordering-template.json',
+                   'font-catalog.json', 'sample-fonts.json', 'n1-exact.sty'}
         original_read = Path.read_text
         reads = set()
 
         def read_text(path, *args, **kwargs):
             if path.parent == ROOT / 'profiles/n1-original':
-                self.assertNotIn(path.name, forbidden,
-                                 f'Default rules unexpectedly loaded legacy body data: {path}')
+                self.assertIn(path.name, allowed, f'Unexpected profile resource: {path}')
                 reads.add(path.name)
             return original_read(path, *args, **kwargs)
 
@@ -60,8 +48,6 @@ class DefaultBuildTests(unittest.TestCase):
                 item['id'] for item in groups['G6']['items'][:2]
             ]}]
             blueprint['components_file'] = str(ROOT / 'blueprints/components.yaml')
-            blueprint['group_defaults'].update(use_measured=True, _use_measured_heading=True,
-                                               _use_measured_example=True)
             blueprint_path = temporary / 'blueprint.yaml'
             blueprint_path.write_text(yaml.safe_dump(blueprint), encoding='utf-8')
             args = build.parse_args([
@@ -72,13 +58,11 @@ class DefaultBuildTests(unittest.TestCase):
             with patch.object(build, 'parse_args', return_value=args), \
                     patch.object(build, 'load_content', return_value=(groups, documents)), \
                     patch.object(Path, 'read_text', read_text), \
-                    patch.dict(sys.modules, legacy_layout=None, reference_components=None), \
                     redirect_stdout(stdout), redirect_stderr(stderr):
                 build.main()
             project = temporary / 'out/paper-a-written'
             report = json.loads((project / 'build-report.json').read_text())
             self.assertEqual(report['layout_mode'], 'rules')
-            self.assertFalse(report['deprecated_layout'])
             self.assertFalse(report['compiled'])
             self.assertEqual(report['page_count'], 3)
             self.assertTrue(all(group['mode'] == 'rules' for group in report['components']))
@@ -95,7 +79,6 @@ class DefaultBuildTests(unittest.TestCase):
             with patch.object(build, 'parse_args', return_value=args), \
                     patch.object(build, 'load_content', return_value=(groups, documents)), \
                     patch.object(Path, 'read_text', read_text), \
-                    patch.dict(sys.modules, legacy_layout=None, reference_components=None), \
                     redirect_stdout(StringIO()), redirect_stderr(stderr):
                 build.main()
             self.assertEqual(previous_pdf.read_bytes(), b'previous PDF fixture')

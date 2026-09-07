@@ -1,6 +1,6 @@
 """Validate experimental editorial roles before measuring or drawing content.
 
-These checks are rules-only: the legacy renderer does not interpret rule_style.
+Validate semantic roles and dimensions before composing the current content.
 Unsupported combinations fail explicitly instead of measuring one layout and
 drawing another, or silently omitting a child of a specialized document.
 """

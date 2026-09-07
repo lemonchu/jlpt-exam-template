@@ -14,7 +14,7 @@ sys.path.insert(0,str(ROOT/'engine'))
 
 from build import (
     archive_inputs,insert_facing_interleaf,prepare_group,validate_group_config,
-    write_build_outputs,write_scene_inputs,parse_args,output_directory,selected_layout_mode,
+    write_build_outputs,write_scene_inputs,parse_args,output_directory,
 )
 
 
@@ -23,46 +23,20 @@ class LayoutModeTests(unittest.TestCase):
         default=parse_args([])
         explicit=parse_args(['--rules'])
         self.assertEqual(vars(default),vars(explicit))
-        self.assertEqual(default.layout_mode,'rules')
         self.assertTrue(default.rules)
-        self.assertFalse(default.precise)
-        self.assertFalse(default.recompose)
         self.assertEqual(output_directory(default),ROOT/'output/rules')
 
-    def test_legacy_modes_require_explicit_flags_and_separate_outputs(self):
-        for mode in ('precise','recompose'):
-            with self.subTest(mode=mode):
-                args=parse_args(['--'+mode])
-                self.assertEqual(selected_layout_mode(args),mode)
-                self.assertFalse(args.rules)
-                self.assertEqual(output_directory(args),ROOT/'output'/mode)
-
-    def test_mode_flags_are_mutually_exclusive(self):
-        for first,second in (('rules','precise'),('rules','recompose'),('precise','recompose')):
-            with self.subTest(first=first,second=second):
-                with redirect_stderr(StringIO()),self.assertRaises(SystemExit):
-                    parse_args(['--'+first,'--'+second])
-
     def test_output_override_applies_to_all_modes(self):
-        for flag in ([],['--rules'],['--precise'],['--recompose']):
+        for flag in ([],['--rules']):
             args=parse_args([*flag,'--output-dir','custom-output'])
             self.assertEqual(output_directory(args),Path('custom-output'))
+    def test_removed_modes_are_rejected(self):
+        for flag in ('--precise', '--recompose'):
+            with self.subTest(flag=flag), redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+                parse_args([flag])
 
-    def test_programmatic_namespace_also_defaults_to_rules(self):
-        self.assertEqual(selected_layout_mode(SimpleNamespace()),'rules')
-        self.assertEqual(selected_layout_mode(SimpleNamespace(rules=False)),'rules')
-        self.assertEqual(selected_layout_mode(SimpleNamespace(precise=True)),'precise')
-        self.assertEqual(selected_layout_mode(SimpleNamespace(recompose=True)),'recompose')
-
-    def test_programmatic_modes_cannot_silently_enter_the_legacy_path(self):
-        with self.assertRaisesRegex(ValueError,'Unknown layout mode'):
-            selected_layout_mode(SimpleNamespace(layout_mode='unexpected'))
-        for args in (SimpleNamespace(precise=True,recompose=True),
-                     SimpleNamespace(rules=True,precise=True),
-                     SimpleNamespace(layout_mode='rules',recompose=True)):
-            with self.subTest(args=args):
-                with self.assertRaisesRegex(ValueError,'mutually exclusive'):
-                    selected_layout_mode(args)
+    def test_programmatic_output_defaults_to_rules(self):
+        self.assertEqual(output_directory(SimpleNamespace()), ROOT/'output/rules')
 
 
 class GroupConfigValidationTests(unittest.TestCase):
@@ -209,7 +183,6 @@ class BuildArtifactTests(unittest.TestCase):
             report=json.loads((out/'build-report.json').read_text())
             self.assertFalse(report['compiled'])
             self.assertEqual(report['layout_mode'],'rules')
-            self.assertFalse(report['deprecated_layout'])
             self.assertEqual(report['page_count'],2)
             self.assertEqual(list(report['inputs']),['blueprint.yaml'])
             usage=json.loads((out/'composition-font-usage.json').read_text())

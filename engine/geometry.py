@@ -1,4 +1,4 @@
-"""Calibrated N1 dimensions shared by measured and flowing components.
+"""Calibrated N1 dimensions shared by layout and fixed templates.
 
 All lengths are PDF bp. Page positions use a top-left origin; component
 positions are offsets from the current body's left edge and text baseline.
@@ -49,15 +49,6 @@ class BodyGrid:
 
     def geometry(self, page_number, overrides=None):
         return self.left(page_number, overrides), float((overrides or {}).get('body_width', self.width))
-
-    def matches(self, layout):
-        """Whether a measured fragment fits the current body without reflow."""
-        actual = (layout.W, layout.H, layout.top, layout.bottom, layout.fs,
-                  layout.leading, layout.left, layout.width)
-        expected = (PAPER_WIDTH, PAPER_HEIGHT, self.top, BODY_BOTTOM, self.font_size,
-                    self.line_height, self.left(layout.n()), self.width)
-        return all(abs(a - b) < 1e-4 for a, b in zip(actual, expected))
-
 
 WRITTEN = BodyGrid(78.96, 63.63, 452.41, 62.4928, 11.3, 24.05996)
 LISTENING = BodyGrid(63.45, 45.21, 513.6, 61.4489, 14.2, 28.35)

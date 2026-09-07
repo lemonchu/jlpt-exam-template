@@ -3,15 +3,12 @@ from pathlib import Path
 import copy
 import sys
 import unittest
-import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'engine'))
 
 from component_layout import ComponentLayout
 from inline import Atom
-from reference_components import ReferenceComponents
-from semantic_bindings import CalibrationMismatch, chars_for
 from reading_rules import (CompactReference, MaterialColon, MaterialDash, ReadingRules,
                            citation_parts, cloze_frame, justified_gaps, kana_compressed_gaps, punctuation_gaps,
                            row_ink_height)
@@ -57,28 +54,6 @@ class FlowProbe(ReadingRules, ComponentLayout):
 
 
 class ReadingRuleTests(unittest.TestCase):
-    def test_a_restored_vector_dash_keeps_exact_glyphs_and_strict_contract(self):
-        group = yaml.safe_load((ROOT / 'content/paper-a/G.yaml').read_text())['groups'][2]
-        field = 'G:/groups/2/items/0/stimulus/1/blocks/8/text#base'
-        text = group['items'][0]['stimulus'][1]['blocks'][8]['text']
-        self.assertIn('足を踏ん張り、――行うのだ。', text)
-        self.assertEqual(chars_for(text, 'base')[108:110], ['―', '―'])
-        reference = ReferenceComponents(ROOT / 'profiles/n1-original', ROOT / 'content/common/metadata.yaml')
-        reference.require_layout_compatibility(group)
-        self.assertEqual(reference.bindings['fields'][field]['shape']['vector_marks'][-2:],
-                         [[108, '―'], [109, '―']])
-        resolved, _ = reference.resolve_runs(group, ['G-p05-r52', 'G-p05-r53', 'G-p05-r54'])
-        self.assertEqual(''.join(resolved['G-p05-r52']['glyphs']),
-                         'いうように中に入ってくる。そして、足を踏ん張り、行うのだ。')
-        self.assertEqual(''.join(resolved['G-p05-r53']['glyphs']), '（注４）')
-        self.assertEqual(''.join(resolved['G-p05-r54']['glyphs']), 'これ見よがしに。')
-        changed = copy.deepcopy(group)
-        changed['items'][0]['stimulus'][1]['blocks'][8]['text'] = text.replace('――行う', '行う')
-        with self.assertRaises(CalibrationMismatch):
-            reference.require_layout_compatibility(changed)
-        with self.assertRaises(CalibrationMismatch):
-            reference.resolve_runs(changed, ['G-p05-r52'])
-
     def test_a_expanded_row_uses_quantized_space_and_rigid_punctuation(self):
         # A R10: its first line contains 38 base glyphs in a 39-cell measure.
         text = '暮らしの中で身近な木といえば、街路樹と公園の樹木、そして住宅の庭の木あたりで'

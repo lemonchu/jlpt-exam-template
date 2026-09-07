@@ -13,7 +13,7 @@ from build import renumber_group,select_items,validate_blueprint
 from calibrated_renderer import Font,Resolver
 from component_fonts import ComponentFonts
 from font_overrides import COVER_ROLES,_config,_cover_warnings,_validate_tex_path
-from reference_components import ReferenceComponents
+from cover_templates import CoverTemplates
 from semantic_bindings import iter_questions,pointer
 
 
@@ -56,12 +56,12 @@ class FontConfigurationTests(unittest.TestCase):
             _validate_tex_path(Path('/tmp/font#bad.otf'),'cover_symbol')
 
     def test_empty_cover_metadata_needs_no_cover_fonts(self):
-        reference=ReferenceComponents(ROOT/'profiles/n1-original',ROOT/'content/common/metadata.yaml')
+        reference=CoverTemplates(ROOT/'profiles/n1-original',ROOT/'content/common/metadata.yaml')
         self.assertEqual(reference._cover_marks('written'),([],{}))
 
     def test_enabled_cover_reports_missing_role(self):
         profile=ROOT/'profiles/n1-original'
-        reference=ReferenceComponents(profile,ROOT/'content/paper-2014-12/metadata.yaml')
+        reference=CoverTemplates(profile,ROOT/'content/paper-2014-12/metadata.yaml')
         reference.fonts=ComponentFonts(profile,None,ROOT)
         with self.assertRaisesRegex(ValueError,r'fonts\.cover_session'):
             reference._cover_marks('written')

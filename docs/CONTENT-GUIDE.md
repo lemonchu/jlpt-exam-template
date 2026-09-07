@@ -6,7 +6,7 @@
 4. 先按[字体说明](FONTS.md)在 `fonts.yaml` 配置所需完整字体，再运行 `python3 build.py --paper my-exam --booklet written --blueprint blueprints/custom.yaml`。默认使用规则排版，打开 `output/rules/N1-my-exam-written.pdf` 逐页检查；听力改用 `--booklet listening`。
 5. 检查 `output/rules/my-exam-written/render-report.json`。默认 A/B 和自编内容都可能需要完整字体；缺字按提示配置，不会自动换字族。`--fonts other-fonts.yaml` 可指定独立字体配置。
 
-默认即规则排版，`--rules` 是别名；`--output-dir` 指定产物目录。旧 `--precise`、`--recompose` 已弃用，仅供对照，详见[排版说明](RULE-LAYOUT.md)。
+默认即规则排版，`--rules` 是别名；`--output-dir` 指定产物目录。详见[排版说明](RULE-LAYOUT.md)。
 
 封面年份与圈标在元数据 `booklets.written` 或 `booklets.listening` 下选填 `session_label: "（２０２３－２）"`、`form_symbol: A`；省略、`null` 或空字符串时不绘制。字段见[SCHEMA.md](SCHEMA.md#公共元数据)，对应字体见[FONTS.md](FONTS.md)。
 

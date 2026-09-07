@@ -6,18 +6,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'engine'))
 
-from inline import Atom, parse, measure
+from inline import parse, measure
 from component_layout import ComponentLayout
 from rule_typography import mono_ruby, ruby_layout, material_number_atoms, RuleFonts, TypographyRules, _CJK_ADVANCES
-from semantic_bindings import shape, inline_layout_signature
 
 
 class RubyRuleTests(unittest.TestCase):
-    def test_partitions_preserve_measured_contract(self):
+    def test_partitions_preserve_reading_and_record_character_boundaries(self):
         old = '｜商品《しょうひん》を選ぶ'
         new = '｜商品《しょう|ひん》を選ぶ'
-        self.assertEqual(shape(old), shape(new))
-        self.assertEqual(inline_layout_signature(old), inline_layout_signature(new))
+        self.assertEqual(parse(old)[0].text, parse(new)[0].text)
+        self.assertEqual(parse(old)[0].ruby, parse(new)[0].ruby)
         self.assertEqual(parse(new)[0].ruby, 'しょうひん')
         self.assertEqual(parse(new)[0].ruby_parts, ('しょう', 'ひん'))
 
