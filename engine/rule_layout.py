@@ -102,12 +102,6 @@ class RuleLayout(GroupFlow, OrderingTemplates, ListeningRules, ChoiceRules, Refe
         validate_rule_content(group)
         if not isinstance(config.get('new_page', True), bool):
             raise ValueError('new_page must be true or false')
-        rule_config = {
-            **config,
-            'use_measured': False,
-            '_use_measured_heading': False,
-            '_use_measured_example': False,
-        }
-        super().render_group(group, rule_config)
+        super().render_group(group, config)
         self.component_audit[-1]['mode'] = 'rules'
         self.component_audit[-1]['reason'] = 'Semantic content and shared generation rules'

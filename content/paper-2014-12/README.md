@@ -18,7 +18,7 @@ python3 build.py --paper paper-2014-12 --booklet listening
 
 成品：`output/rules/N1-paper-2014-12-written.pdf`、`output/rules/N1-paper-2014-12-listening.pdf`。默认读取 `fonts.yaml`，可用 `--fonts /path/to/my-fonts.yaml` 指定字体配置、`--output-dir` 改输出目录。字体无需安装到系统，也不提交 Git。
 
-默认使用规则版，`examples/` 是保留的展示成品，不自动覆盖。旧模式与分页边界见[排版说明](../../docs/RULE-LAYOUT.md)。
+默认使用规则版，`examples/` 保存已验证的规则版展示成品，不自动覆盖。旧模式与分页边界见[排版说明](../../docs/RULE-LAYOUT.md)。
 
 ## 排版与校对范围
 
