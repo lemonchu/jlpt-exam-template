@@ -10,8 +10,8 @@ import fitz
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'engine'))
 
-from inline import (REFERENCE_BOX_CLOSING_MARGIN,REFERENCE_BOX_MARGIN,
-                    REFERENCE_BOX_SUFFIX_WIDTH,REFERENCE_BOX_WIDTH,measure,parse)
+from inline import measure,parse
+from geometry import CLOZE_BOX
 from material_primitives import MaterialPrimitives
 
 
@@ -54,8 +54,8 @@ class InlineReferenceTests(unittest.TestCase):
         self.assertEqual([atom.text for atom in atoms],['前','〔12-A〕','。','後'])
 
         measured=measure(atoms,FixedCatalog(),11.3)
-        expected=(REFERENCE_BOX_WIDTH+REFERENCE_BOX_SUFFIX_WIDTH
-                  +REFERENCE_BOX_MARGIN+REFERENCE_BOX_CLOSING_MARGIN)
+        expected=(CLOZE_BOX.width+CLOZE_BOX.suffix_width
+                  +CLOZE_BOX.margin+CLOZE_BOX.closing_margin)
         self.assertAlmostEqual(measured[1].width,expected)
 
 

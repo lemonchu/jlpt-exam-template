@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import fitz
 from inline import lines,parse
+from geometry import metric
 
 DEFAULT_PAGE={'width':595,'height':842,'margin_left':78.96,'margin_right':63.63,'margin_top':62.4928,'margin_bottom':59,'font_size':11.3,'line_height':24.05996}
 VERTICAL_FORMS={'、':'︑','。':'︒','「':'﹁','」':'﹂','『':'﹃','』':'﹄','（':'︵','）':'︶','(':'︵',')':'︶'}
@@ -32,18 +33,42 @@ class MaterialPrimitives:
         if self.page is None:self.new_page()
         elif self.y+height>self.bottom+1e-6:self.new_page()
 
+    def opening_keep_height(self, block, default, width, *, prefix=0, consume=True):
+        """Relax only the planned opening box's optional whole-material keep.
+
+        Block preparation makes shallow copies, so its children identify the
+        same authored box; equal but separately authored boxes do not match.
+        A preceding A/B label may inspect this keep before the box consumes it.
+        """
+        target = getattr(self, '_opening_split_block', None)
+        matches = (isinstance(target, dict)
+                   and (block is target or 'blocks' in block
+                        and block['blocks'] is target.get('blocks')))
+        if not getattr(self, '_split_group_opening', False) or not matches:
+            return default
+        minimum = getattr(self, '_opening_split_minimum', None)
+        if minimum is None:
+            minimum = self.opening_block_keep(block, width)['minimum']
+        if consume:
+            self._opening_split_block = self._opening_split_minimum = None
+        return prefix + minimum
+
     def gap(self,height):
         if self.page is None:self.new_page()
         self.y=min(self.y+height,self.bottom)
 
-    def rule(self,x1,y1,x2,y2,width=.33,color='.13725 .12157 .12549'):
-        self.emit('\\FlowVector{q %s RG %.5f w %.5f %.5f m %.5f %.5f l S Q}'%(color,width,x1,self.H-y1,x2,self.H-y2))
+    def emit(self,command):
+        """Measured and flowing layouts emit the same structured scene."""
+        self.page['commands'].append(command)
 
-    def rect(self,x,y,w,h,fill=None,stroke=True):
-        ops='q .13725 .12157 .12549 RG .33 w '
+    def rule(self,x1,y1,x2,y2,width=.33,color='.13725 .12157 .12549'):
+        self.emit({'type':'vector','pdf':'q %s RG %.5f w %.5f %.5f m %.5f %.5f l S Q'%(color,width,x1,self.H-y1,x2,self.H-y2)})
+
+    def rect(self,x,y,w,h,fill=None,stroke=True,line_width=.33):
+        ops=f'q .13725 .12157 .12549 RG {line_width:.5f} w '
         if fill:ops+=fill+' rg '
         ops+='%.5f %.5f %.5f %.5f re %s Q'%(x,self.H-y-h,w,h,'B' if fill and stroke else 'f' if fill else 'S')
-        self.emit('\\FlowVector{'+ops+'}')
+        self.emit({'type':'vector','pdf':ops})
 
     def get_lines(self,text,size=None,width=None,bold=False):
         return lines(text,self.catalog,size or self.fs,width or self.width,self.section,bold)
@@ -70,10 +95,14 @@ class MaterialPrimitives:
         return name,w,h
 
     def image(self,b,x,width):
+        offset=x-self.left
         name,w,h=self.image_geometry(b,width)
         if h>self.usable:w*=self.usable/h;h=self.usable
-        self.ensure(h+4);left=x+(width-w)/2
-        self.emit('\\FlowImage{%s}{%.5f}{%.5f}{%.5f}{%.5f}'%(name,w,h,left,self.H-self.y-h));self.y+=h+4
+        self.ensure(h+4);left=self.left+offset+(width-w)/2
+        # Preserve the calibrated five-decimal precision without a TeX round trip.
+        self.emit({'type':'image','asset':name,'width':round(w,5),'height':round(h,5),
+                   'x':round(left,5),'y':round(self.H-self.y-h,5)})
+        self.y+=h+4
 
     def box_width(self,b,width):
         children=b.get('blocks',[])
@@ -83,7 +112,8 @@ class MaterialPrimitives:
         return width
 
     def blocks(self,blocks,x=None,width=None):
-        x=self.left if x is None else x;width=self.width if width is None else width;i=0
+        offset=0 if x is None else x-self.left
+        width=self.width if width is None else width;i=0
         while i<len(blocks):
             b=blocks[i]
             if b.get('type')=='paragraph' and b.get('style')=='small':
@@ -91,9 +121,23 @@ class MaterialPrimitives:
                 while end<len(blocks) and blocks[end].get('type')=='paragraph' and blocks[end].get('style')=='small':end+=1
                 height=sum(self.estimate_block(z,width) for z in blocks[i:end])
                 if height<=self.usable:self.ensure(height)
-                for child in blocks[i:end]:self.block(child,x,width)
+                for child in blocks[i:end]:self.block(child,self.left+offset,width)
                 i=end
-            else:self.block(b,x,width);i+=1
+            else:self.block(b,self.left+offset,width);i+=1
+
+    def frame_segments(self,first,start_y,offset,width,line_width=.33):
+        """Enclose flowed content using each page's own mirrored body origin."""
+        last=len(self.pages)-1
+        current=self.page
+        try:
+            for index in range(first,last+1):
+                top=start_y if index==first else self.top
+                bottom=self.y if index==last else self.bottom
+                self.page=self.pages[index]
+                left=self.page_left(self.start_page+index)+offset
+                self.rect(left,top,width,max(0,bottom-top),line_width=line_width)
+        finally:
+            self.page=current
 
     def estimate_block(self,b,width=None):
         width=width or self.width;t=b.get('type')
@@ -123,19 +167,15 @@ class MaterialPrimitives:
             h=min(float(b.get('height',260)),self.usable)
             self.ensure(h);self.paragraph(b.get('label','－メモ－'),x,width,align='center');self.y+=max(0,h-max(self.leading,self.fs*1.82))
         elif t=='box':
-            narrow=self.box_width(b,width);x+=(width-narrow)/2;width=narrow
+            narrow=self.box_width(b,width);offset=x-self.left+(width-narrow)/2;width=narrow
             est=self.estimate_block(b,width)
-            if est<=self.usable:self.ensure(est)
-            else:self.ensure(min(est,2*self.leading+16))
-            starts={len(self.pages)-1:self.y};self.y+=8
-            self.blocks(b.get('blocks',[]),x+8,width-16)
-            self.y+=8;last=len(self.pages)-1
-            # Every page segment has its own enclosing rectangle; text may continue naturally.
-            current=self.page
-            for pi in range(min(starts),last+1):
-                top=starts.get(pi,self.top);bottom=self.y if pi==last else self.bottom
-                self.page=self.pages[pi];self.rect(x,top,width,max(0,bottom-top))
-            self.page=current;self.gap(6)
+            need=est if est<=self.usable else min(est,2*self.leading+16)
+            self.ensure(self.opening_keep_height(b,need,width))
+            first=len(self.pages)-1;start_y=self.y;self.y+=8
+            self.blocks(b.get('blocks',[]),self.left+offset+8,width-16)
+            self.y+=8
+            self.frame_segments(first,start_y,offset,width)
+            self.gap(6)
         elif t=='table':self.table(b,x,width)
         elif t=='vertical':self.vertical(b,x,width)
         else:raise ValueError(f'Unknown stimulus block type {t!r}')
@@ -150,18 +190,12 @@ class MaterialPrimitives:
         weights=b.get('column_widths',configured.get(n,configured.get(str(n),[1]*n)))
         if len(weights)!=n or min(weights)<=0:raise ValueError('Invalid table column widths')
         widths=[width*w/sum(weights) for w in weights]
-        def metric(name,default,allow_zero=False):
-            raw=b.get(name,self.gc.get(name,default))
-            if isinstance(raw,bool):raise ValueError(f'{name} must be a number')
-            try:value=float(raw)
-            except (TypeError,ValueError) as e:raise ValueError(f'{name} must be a number') from e
-            if value<0 or (not allow_zero and value==0):raise ValueError(f'{name} must be positive')
-            return value
-        size=metric('table_font_size',self.fs*.91)
-        lead=metric('table_line_height',max(size*1.8,18))
-        pad_x=metric('table_cell_padding_x',5,True)
-        pad_top=metric('table_cell_padding_top',4,True)
-        pad_bottom=metric('table_cell_padding_bottom',6,True)
+        settings={**self.gc,**b}
+        size=metric(settings,'table_font_size',self.fs*.91)
+        lead=metric(settings,'table_line_height',max(size*1.8,18))
+        pad_x=metric(settings,'table_cell_padding_x',5,allow_zero=True)
+        pad_top=metric(settings,'table_cell_padding_top',4,allow_zero=True)
+        pad_bottom=metric(settings,'table_cell_padding_bottom',6,allow_zero=True)
         if any(w<=2*pad_x for w in widths):raise ValueError('Table cell padding leaves no text width')
         configured_alignments=self.gc.get('table_column_alignments',{})
         if not isinstance(configured_alignments,dict):raise ValueError('table_column_alignments must map column counts to alignment lists')
@@ -193,13 +227,14 @@ class MaterialPrimitives:
 
     def table(self,b,x,width):
         x,width=self.table_geometry(b,x,width)
+        offset=x-self.left
         borders=b.get('borders',True)
         if not isinstance(borders,bool):raise ValueError('Table borders must be true or false')
         widths,heights,prepared,size,lead,alignments,header_alignments,pad_x,pad_top=self.table_rows(b,width);headers=int(b.get('header_rows',0))
         header_fill=b.get('header_fill',True)
         if not isinstance(header_fill,bool):raise ValueError('Table header_fill must be true or false')
         def drawrow(i):
-            h=heights[i];self.ensure(h);xx=x
+            h=heights[i];self.ensure(h);xx=self.left+offset
             row_alignments=header_alignments if i<headers else alignments
             for ls,w,alignment in zip(prepared[i],widths,row_alignments):
                 fill='.94 .94 .94' if header_fill and i<headers else None
@@ -217,6 +252,7 @@ class MaterialPrimitives:
         self.gap(6)
 
     def vertical(self,b,x,width):
+        offset=x-self.left
         size=float(b.get('font_size',self.fs));pitch=size*1.75;column_height=min(float(b.get('column_height',self.gc.get('vertical_column_height',280))),self.usable-12)
         cells=max(1,int(column_height/(size*1.04)));maxcols=max(1,int(width/pitch));atoms=parse(b.get('text',''))
         cols=[];col=[]
@@ -234,7 +270,7 @@ class MaterialPrimitives:
             batch=cols[start:start+maxcols];h=max(map(len,batch))*size*1.04+12
             self.ensure(h)
             for ci,column in enumerate(batch):
-                xx=x+(width+len(batch)*pitch)/2-size-(ci*pitch)
+                xx=self.left+offset+(width+len(batch)*pitch)/2-size-(ci*pitch)
                 for ri,(ch,a,ai) in enumerate(column):
                     yy=self.y+size*1.15+ri*size*1.04
                     drawn=VERTICAL_FORMS.get(ch,ch)

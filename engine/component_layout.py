@@ -1,8 +1,8 @@
 """N1 components using the same measured typography for arbitrary semantic text."""
 from dataclasses import replace
 import re,copy
-from inline import (parse,plain,measure,OPEN,CLOSE,REFERENCE_BOX_WIDTH,
-                    REFERENCE_BOX_SUFFIX_WIDTH,REFERENCE_BOX_MARGIN)
+from inline import parse,plain,measure,OPEN,CLOSE,REFERENCE_BOX_RE
+from geometry import CHOICE,CLOZE_BOX,body_grid,metric,require_number
 from material_primitives import MaterialPrimitives
 from semantic_bindings import CalibrationMismatch,iter_questions
 from page_furniture import decorate
@@ -17,22 +17,12 @@ class ComponentLayout(MaterialPrimitives):
         self.reference=reference;self.resolved=reference.resolved;self.component_audit=[];self.run_counter=0
         self.top=float(self.p.get('margin_top',62.4928));self.bottom=float(self.p.get('body_bottom',770));self.y=self.top
     def geometry(self):
-        odd=self.n()%2==1
-        if self.section=='L':left=63.45 if odd else 45.21;width=513.6
-        else:left=78.96 if odd else 63.63;width=452.41
-        self.left=float(self.p.get('left_odd' if odd else 'left_even',left));self.width=float(self.p.get('body_width',width))
+        self.left,self.width=body_grid(self.section).geometry(self.n(),self.p)
+    def page_left(self,page_number):
+        return body_grid(self.section).left(page_number,self.p)
     def measured_geometry_compatible(self):
         """Whether a measured fragment still fits the canonical A page grid."""
-        listening=self.section=='L'
-        expected_top=61.4489 if listening else 62.4928
-        expected_size=14.2 if listening else 11.3
-        expected_leading=28.35 if listening else 24.05996
-        odd=self.n()%2==1
-        expected_left=(63.45 if odd else 45.21) if listening else (78.96 if odd else 63.63)
-        expected_width=513.6 if listening else 452.41
-        actual=(self.W,self.H,self.top,self.bottom,self.fs,self.leading,self.left,self.width)
-        expected=(595.0,842.0,expected_top,783.0,expected_size,expected_leading,expected_left,expected_width)
-        return all(abs(a-b)<1e-4 for a,b in zip(actual,expected))
+        return body_grid(self.section).matches(self)
     def _is_cloze(self):
         return bool(self.section=='G' and self.group and self.group.get('kind')=='cloze')
     def _uses_reading_spacing(self):
@@ -55,13 +45,6 @@ class ComponentLayout(MaterialPrimitives):
         if not side.get('text'):side['text']={'V':'文字・語彙','G':'文法','R':'読解','L':'聴解'}[self.section]
         side.setdefault('section',self.section)
         if not any(b.get('text')==side['text'] for b in self.page['bands']):self.page['bands'].append(side)
-    def emit(self,cmd):
-        if isinstance(cmd,dict):self.page['commands'].append(cmd);return
-        if cmd.startswith('\\FlowVector{'):self.page['commands'].append({'type':'vector','pdf':cmd[len('\\FlowVector{'):-1]});return
-        m=re.fullmatch(r'\\FlowImage\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}',cmd)
-        if m:
-            asset,w,h,x,y=m.groups();self.page['commands'].append({'type':'image','asset':asset,'width':float(w),'height':float(h),'x':float(x),'y':float(y)});return
-        raise ValueError('Non-scene command in component renderer: '+cmd[:60])
     def glyph(self,ch,size,x,baseline,bold=False,color='0.13725,0.12157,0.12549',rotation=0,semantic_char=None,role=None,hscale=1):
         if ch in ' \u3000\t\n':return
         semantic=semantic_char or ch
@@ -78,7 +61,7 @@ class ComponentLayout(MaterialPrimitives):
     def tracking_units(atom):
         # A framed cloze reference is one layout object even though its
         # semantic spelling contains several characters.
-        return 1 if re.fullmatch(r'〔[0-9]+(?:-[A-Za-z])?〕',atom.text) else max(1,len(atom.text))
+        return 1 if REFERENCE_BOX_RE.fullmatch(atom.text) else max(1,len(atom.text))
     def tracking_gaps(self,atoms,rigid_blanks=False):
         if not rigid_blanks:return max(0,sum(self.tracking_units(a) for a in atoms)-1)
         gaps=0;previous_flexible=False
@@ -104,23 +87,23 @@ class ComponentLayout(MaterialPrimitives):
         elif width is not None and align=='right':x+=width-tw
         baseline=top+size;natural_x=x;tracking_shift=0;previous_flexible=False
         for a in atoms:
-            reference=re.fullmatch(r'〔([0-9]+)(-[A-Za-z])?〕',a.text)
+            reference=REFERENCE_BOX_RE.fullmatch(a.text)
             atom_units=self.tracking_units(a)
             atom_gaps=max(0,atom_units-1)
             flexible=not rigid_blanks or (not a.underline and not a.text.isspace())
             if flexible and previous_flexible:tracking_shift+=tracking
             atom_x=natural_x+tracking_shift
             if reference:
-                scale=size/11.3;label=reference[1]+(reference[2] or '')
-                frame_width=(REFERENCE_BOX_WIDTH+(REFERENCE_BOX_SUFFIX_WIDTH if reference[2] else 0))*scale
-                margin=REFERENCE_BOX_MARGIN*scale
+                box=CLOZE_BOX;scale=size/box.body_size;label=reference[1]+(reference[2] or '')
+                frame_width=box.frame_width(reference[2],scale)
+                margin=box.margin*scale
                 frame_x=atom_x+margin
-                self.rect(frame_x,baseline-12.655*scale,frame_width,16.742*scale)
-                label_width=(len(reference[1])*5.070304+(len(reference[2] or '')*4.6))*scale
+                self.rect(frame_x,baseline+box.top_from_baseline*scale,frame_width,box.height*scale)
+                label_width=(len(reference[1])*box.digit_advance+(len(reference[2] or '')*box.suffix_advance))*scale
                 xx=frame_x+(frame_width-label_width)/2
                 for ch in label:
-                    self.glyph(ch,9.2*scale,xx,baseline-.798*scale,role='question-number' if ch.isdigit() else 'body',hscale=.8 if ch.isdigit() else 1)
-                    xx+=(5.070304 if ch.isdigit() else 4.6)*scale
+                    self.glyph(ch,box.label_size*scale,xx,baseline+box.label_from_baseline*scale,role='question-number' if ch.isdigit() else 'body',hscale=.8 if ch.isdigit() else 1)
+                    xx+=(box.digit_advance if ch.isdigit() else box.suffix_advance)*scale
                 natural_x+=a.width
                 if flexible:tracking_shift+=tracking*atom_gaps
                 previous_flexible=flexible;continue
@@ -276,7 +259,8 @@ class ComponentLayout(MaterialPrimitives):
             if child.get('type')=='heading' and i+1<len(blocks) and blocks[i+1].get('type')=='box':
                 frame=dict(blocks[i+1],_reading_ab=True)
                 need=19.03+self.estimate_block(frame,width)
-                self.ensure(need if need<=self.usable else 19.03+2*self.leading+16)
+                keep=need if need<=self.usable else 19.03+2*self.leading+16
+                self.ensure(self.opening_keep_height(frame,keep,width,prefix=19.03,consume=False))
                 self.line(self.get_lines(child.get('text',''),11.3,width,True)[0],self.left+offset,self.y,11.3)
                 self.y+=19.03
                 self.reading_box(frame,self.left+offset,width)
@@ -328,22 +312,17 @@ class ComponentLayout(MaterialPrimitives):
         if cloze_material:self._cloze_material_depth=previous_depth+1
         try:est=self.estimate_block(b,width)
         finally:self._cloze_material_depth=previous_depth
-        self.ensure(est if est<=self.usable else min(est,2*self.leading+padtop+padbottom))
+        need=est if est<=self.usable else min(est,2*self.leading+padtop+padbottom)
+        self.ensure(self.opening_keep_height(b,need,width))
         first=len(self.pages)-1;start_y=self.y
         self.y+=padtop
         if cloze_material:self._cloze_material_depth=previous_depth+1
         try:self.blocks(children,self.left+offset+inset,width-2*inset,tail_reserve=padbottom)
         finally:self._cloze_material_depth=previous_depth
-        self.y+=padbottom;last=len(self.pages)-1;current=self.page
+        self.y+=padbottom
         stroke=float(self.gc.get('material_box_stroke',1.71 if cloze_material else .33))
-        for pi in range(first,last+1):
-            odd=(self.start_page+pi)%2==1
-            page_left=float(self.p.get('left_odd' if odd else 'left_even',78.96 if odd else 63.63))
-            top=start_y if pi==first else self.top
-            bottom=self.y if pi==last else self.bottom
-            self.page=self.pages[pi]
-            self.emit({'type':'vector','pdf':f'q .13725 .12157 .12549 RG {stroke:.5f} w {page_left+offset:.5f} {self.H-bottom:.5f} {width:.5f} {max(0,bottom-top):.5f} re S Q'})
-        self.page=current;self.gap(after)
+        self.frame_segments(first,start_y,offset,width,stroke)
+        self.gap(after)
         self._last_was_note=False;self._last_note_wrapped=False;self._last_material_kind='box'
     def paragraph_spec(self,b,width):
         """Return the shared measurement/drawing settings for one paragraph."""
@@ -359,12 +338,18 @@ class ComponentLayout(MaterialPrimitives):
                     if getattr(self,'_last_was_note',False) else 20.96)
         else:before=0
         return size,leading,bold,is_note,small,align,indent,before
+    def paragraph_body_text(self,block):
+        """Use the same below-word marker text for measurement and drawing."""
+        text=block.get('text','')
+        if self.section=='R' and block.get('style')!='small':
+            return re.sub(r'([①②③④⑤⑥⑦⑧⑨⑩])__(.*?)__',
+                          lambda match:'{{'+match[1]+'|__'+match[2]+'__}}',text)
+        return text
     def block(self,b,x=None,width=None):
         x=self.left if x is None else x;width=self.width if width is None else width;t=b['type']
         if t in ('paragraph','heading'):
             size,leading,bold,is_note,small,align,indent,before=self.paragraph_spec(b,width);self.gap(before)
-            body_text=b.get('text','')
-            if self.section=='R' and not small:body_text=re.sub(r'([①②③④⑤⑥⑦⑧⑨⑩])__(.*?)__',lambda m:'{{'+m[1]+'|__'+m[2]+'__}}',body_text)
+            body_text=self.paragraph_body_text(b)
             note_lines=len(self.get_lines(body_text,size,width,bold)) if is_note else 0
             self.paragraph(body_text,x,width,size,leading,bold,align,gap=0,indent=indent,reserve_after=b.get('_reserve_after',0))
             self._last_was_note=is_note
@@ -395,22 +380,9 @@ class ComponentLayout(MaterialPrimitives):
         if isinstance(configured,bool) or str(configured) not in ('1','2','4'):
             raise ValueError('options_columns must be auto, 1, 2, or 4')
         return int(configured)
-    def option_geometry(self,cols,available):
-        if cols not in (1,2,4):raise ValueError('Choice columns must be 1, 2, or 4')
-        if isinstance(available,bool) or not isinstance(available,(int,float)) or available<=0:
-            raise ValueError('Choice width must be a positive number')
-        starts=self.option_starts(cols);widths=[]
-        for j,start in enumerate(starts):
-            end=starts[j+1]-11.31 if j+1<cols else available
-            first=end-start-22.62;rest=end-start-11.31
-            if min(first,rest)<=0:raise ValueError('Choice width is too narrow for its columns')
-            # Source coordinates round a 67.861 bp slot to 67.86. The same
-            # tolerance must govern both auto selection and real line breaks.
-            widths.append((first+.05,rest+.05))
-        return starts,widths
     def _auto_columns(self,available,option_atoms):
         for cols in (4,2,1):
-            try:_,widths=self.option_geometry(cols,available)
+            try:_,widths=CHOICE.geometry(cols,available)
             except ValueError:continue
             # Auto layout uses the repeated grid's narrowest cell. The last
             # cell reaches the page edge and must not alone make a row qualify
@@ -418,87 +390,150 @@ class ComponentLayout(MaterialPrimitives):
             capacity=min(first for first,_ in widths)
             if all(sum(a.width for a in atoms)<=capacity for atoms in option_atoms):return cols
         return 1
-    def option_starts(self,cols):
-        # A's four answer-number anchors form a regular 101.79 bp grid.
-        # Two-column answers use every other anchor from that same grid.
-        if cols==4:return [16.95,118.74,220.53,322.32]
-        if cols==2:return [16.95,220.53]
-        return [16.95]
-    def choice_metrics(self,item):
-        options=item.get('options',[])
-        if len(options)!=4:raise ValueError('Choice must have four options: '+item.get('id',''))
-        size=float(self.gc.get('font_size',self.fs));lead=float(self.gc.get('line_height',self.leading));prompt=item.get('prompt','')
-        rigid_blanks=bool(self.group and self.group.get('kind')=='word_order')
+    def material_height(self, blocks, width):
+        return sum(self.estimate_block(block, width) for block in blocks)
+
+    def choice_prompt_plan(self, item, size, rigid_blanks):
+        """Plan prompt rows; specialized typography may supply its own insets."""
+        prompt = item.get('prompt', '')
         # Vocabulary prompts in A occasionally use about -.42 bp tracking to
-        # keep a short sentence on one line.  Ordering questions use the more
-        # conservative -.30 bp limit visible in A; forcing them as tightly as
-        # vocabulary changes which words and blank slots cross the line break.
-        default_tracking=.15 if rigid_blanks else .45
-        def nonnegative(name,default):
-            raw=self.gc.get(name,default)
-            if isinstance(raw,bool):raise ValueError(f'{name} must be a non-negative number')
-            try:value=float(raw)
-            except (TypeError,ValueError) as e:raise ValueError(f'{name} must be a non-negative number') from e
-            if value<0:raise ValueError(f'{name} must be a non-negative number')
-            return value
-        max_tracking=nonnegative('choice_prompt_max_negative_tracking',default_tracking)
-        blank_tracking=nonnegative('word_order_blank_max_negative_tracking',.27)
+        # stay on one line. Ordering slots need a more conservative limit.
+        max_tracking = metric(self.gc, 'choice_prompt_max_negative_tracking',
+                              .15 if rigid_blanks else .45, allow_zero=True)
+        blank_tracking = metric(self.gc, 'word_order_blank_max_negative_tracking',
+                                .27, allow_zero=True)
         # The first line starts one em to the right of continuation lines and
         # ends at the ordinary body edge. Japanese 、/。 may hang beyond it.
-        first_prompt_width=self.width-28.26;rest_prompt_width=self.width-16.95
-        prompt_atoms=None
-        if rigid_blanks:
-            # In A/B, whitespace touching a slot denotes one fixed em. Parse
-            # first so spaces *inside* an underlined blank remain untouched.
-            prompt_atoms=self.ordering_atoms(prompt,size)
-        promptlines=self.hanging_lines(prompt,size,first_prompt_width,rest_prompt_width,max_negative_tracking=max_tracking,rigid_blanks=rigid_blanks,max_negative_blank_tracking=blank_tracking,hanging_punctuation=True,atoms=prompt_atoms)
-        prompt_tracking=[self.line_tracking(line,first_prompt_width if i==0 else rest_prompt_width,max_tracking,rigid_blanks,blank_tracking,True) or 0.0 for i,line in enumerate(promptlines)]
-        configured=self.configured_columns(item)
-        option_atoms=[measure(parse(text),self.catalog,size,self.section) for text in options]
-        cols=configured if configured!='auto' else self._auto_columns(self.width,option_atoms)
-        starts,widths=self.option_geometry(cols,self.width);oplines=[]
-        for i,(text,atoms) in enumerate(zip(options,option_atoms)):
-            first,rest=widths[i%cols]
-            oplines.append(self.hanging_lines(text,size,first,rest,atoms=atoms))
-        row_counts=[max(len(oplines[i+j]) for j in range(min(cols,4-i))) for i in range(0,4,cols)]
-        explicit_label=str(item['label']) if item.get('label') is not None else '例' if item.get('is_example') else None
-        label_height=lead if explicit_label is not None and not (explicit_label.isascii() and explicit_label.isdigit()) else 0
-        prompt_height=max(1,len(promptlines))*lead+label_height
-        material_height=sum(self.estimate_block(b,self.width-16.95) for b in item.get('stimulus',[]))
-        return {'size':size,'lead':lead,'promptlines':promptlines,'prompt_tracking':prompt_tracking,
-                'rigid_blanks':rigid_blanks,'cols':cols,'starts':starts,'oplines':oplines,
-                'row_counts':row_counts,'total':prompt_height+sum(row_counts)*lead+material_height+float(self.gc.get('question_gap',14.13))}
+        first_prompt_width = self.width - CHOICE.prompt_inset(0)
+        rest_prompt_width = self.width - CHOICE.prompt_inset(1)
+        prompt_atoms = self.ordering_atoms(prompt, size) if rigid_blanks else None
+        promptlines = self.hanging_lines(
+            prompt, size, first_prompt_width, rest_prompt_width,
+            max_negative_tracking=max_tracking, rigid_blanks=rigid_blanks,
+            max_negative_blank_tracking=blank_tracking, hanging_punctuation=True,
+            atoms=prompt_atoms,
+        )
+        prompt_tracking = [
+            self.line_tracking(line, first_prompt_width if i == 0 else rest_prompt_width,
+                               max_tracking, rigid_blanks, blank_tracking, True) or 0.0
+            for i, line in enumerate(promptlines)
+        ]
+        return {'promptlines': promptlines, 'prompt_tracking': prompt_tracking}
+
+    def choice_option_atoms(self, text, size):
+        """Use the same measured atoms for automatic columns and final rows."""
+        return measure(parse(text), self.catalog, size, self.section)
+
+    def choice_option_plan(self, options, option_atoms, widths, cols, size):
+        oplines = []
+        for i, (text, atoms) in enumerate(zip(options, option_atoms)):
+            first, rest = widths[i % cols]
+            oplines.append(self.hanging_lines(text, size, first, rest, atoms=atoms))
+        return oplines
+
+    def choice_metrics(self,item):
+        """Measure each field once, then share one grid/height plan with drawing."""
+        options = item.get('options', [])
+        if len(options) != 4:
+            raise ValueError('Choice must have four options: ' + item.get('id', ''))
+        size = float(self.gc.get('font_size', self.fs))
+        lead = float(self.gc.get('line_height', self.leading))
+        rigid_blanks = bool(self.group and self.group.get('kind') == 'word_order')
+        prompt = self.choice_prompt_plan(item, size, rigid_blanks)
+        configured = self.configured_columns(item)
+        option_atoms = [self.choice_option_atoms(text, size) for text in options]
+        cols = configured if configured != 'auto' else self._auto_columns(self.width, option_atoms)
+        starts, widths = CHOICE.geometry(cols, self.width)
+        oplines = self.choice_option_plan(options, option_atoms, widths, cols, size)
+        row_counts = [max(len(oplines[i + j]) for j in range(min(cols, 4 - i)))
+                      for i in range(0, 4, cols)]
+
+        explicit_label = (str(item['label']) if item.get('label') is not None
+                          else '例' if item.get('is_example') else None)
+        label_height = (lead if explicit_label is not None
+                        and not (explicit_label.isascii() and explicit_label.isdigit()) else 0)
+        prompt_height = max(1, len(prompt['promptlines'])) * lead + label_height
+        material_height = self.material_height(item.get('stimulus', []), self.width - CHOICE.inset)
+        return {
+            'size': size, 'lead': lead, **prompt, 'rigid_blanks': rigid_blanks,
+            'cols': cols, 'starts': starts, 'widths': widths,
+            'oplines': oplines, 'row_counts': row_counts,
+            'total': (prompt_height + sum(row_counts) * lead + material_height
+                      + float(self.gc.get('question_gap', 14.13))),
+        }
+
+    def prompt_line(self, atoms, x, top, size, width, final, tracking, rigid_blanks):
+        self.line(atoms, x, top, size, tracking=tracking, rigid_blanks=rigid_blanks)
+
+    def option_line(self, atoms, x, top, size, width, final):
+        self.line(atoms, x, top, size)
+
     def choice(self,item):
-        if self.section=='L':return self.listening_choice(item)
-        m=self.choice_metrics(item)
-        if m['total']<=self.usable:self.ensure(m['total'])
-        label=self.next_label(item)
-        numeric_label=label.isascii() and label.isdigit()
+        if self.section == 'L':
+            return self.listening_choice(item)
+        opening = getattr(self, '_opening_choice', None)
+        if opening is not None and opening[0] is item:
+            plan = opening[1]
+            self._opening_choice = None
+        else:
+            plan = self.choice_metrics(item)
+        size, lead = plan['size'], plan['lead']
+        split_opening = (getattr(self, '_split_group_opening', False)
+                         and opening is not None and opening[0] is item)
+        if plan['total'] <= self.usable and not split_opening:
+            self.ensure(plan['total'])
+        label = self.next_label(item)
+        numeric_label = label.isascii() and label.isdigit()
         # A numeric label shares the first prompt row; an explicit label such
         # as （問題例） occupies the row immediately above it. Keep that unit
         # together, then allow arbitrarily long prompts to flow line by line.
-        self.ensure(m['lead']*(1 if numeric_label else 2))
-        first=len(self.pages);b=self.y+m['size']
+        self.ensure(lead * (1 if numeric_label else 2))
+        first = len(self.pages)
         if numeric_label:
-            self.rect(self.left-.105,self.y+1.697,16.742,11.073)
-            xx=self.left+(4.83 if len(label)==1 else 2.28)
-            for ch in label:self.glyph(ch,9.2,xx,b-.828,role='question-number',hscale=.8);xx+=5.070304
-        else:self.paragraph(label,size=m['size'],leading=m['lead'],bold=True)
-        for i,ln in enumerate(m['promptlines']):
-            if i:self.ensure(m['lead'])
-            self.line(ln,self.left+(28.26 if i==0 else 16.95),self.y,m['size'],tracking=m['prompt_tracking'][i],rigid_blanks=m['rigid_blanks']);self.y+=m['lead']
-        stimulus=item.get('stimulus',[]);after_options=item.get('stimulus_position')=='after_options'
-        if stimulus and not after_options:self.blocks(stimulus,self.left+16.95,self.width-16.95)
-        for i,count in zip(range(0,4,m['cols']),m['row_counts']):
-            self.ensure(count*m['lead'])
-            for j in range(min(m['cols'],4-i)):
-                start=m['starts'][j]
-                self.line(self.get_lines(str(i+j+1).translate(_FULLWIDTH_DIGITS),m['size'],24)[0],self.left+start,self.y,m['size'])
-                for k,ln in enumerate(m['oplines'][i+j]):self.line(ln,self.left+start+(22.62 if k==0 else 11.31),self.y+k*m['lead'],m['size'])
-            self.y+=count*m['lead']
-        if stimulus and after_options:self.blocks(stimulus,self.left+16.95,self.width-16.95)
-        self.gap(float(self.gc.get('question_gap',14.13)))
-        self.item_records.append({'id':item.get('id'),'source_number':item.get('source_number'),'label':plain(label),'pages':list(range(first,len(self.pages)+1)),'options':4,'columns':m['cols'],'prompt_tracking':[round(v,5) for v in m['prompt_tracking']]})
+            self.rect(self.left - .105, self.y + 1.697, 16.742, 11.073)
+            number_x = self.left + (4.83 if len(label) == 1 else 2.28)
+            for ch in label:
+                self.glyph(ch, 9.2, number_x, self.y + size - .828,
+                           role='question-number', hscale=.8)
+                number_x += 5.070304
+        else:
+            self.paragraph(label, size=size, leading=lead, bold=True)
+
+        for i, line in enumerate(plan['promptlines']):
+            if i:
+                self.ensure(lead)
+            inset = (plan['prompt_insets'][i] if 'prompt_insets' in plan
+                     else CHOICE.prompt_inset(i))
+            self.prompt_line(line, self.left + inset, self.y, size,
+                             self.width - inset,
+                             i + 1 == len(plan['promptlines']),
+                             plan['prompt_tracking'][i], plan['rigid_blanks'])
+            self.y += lead
+        stimulus = item.get('stimulus', [])
+        after_options = item.get('stimulus_position') == 'after_options'
+        if stimulus and not after_options:
+            self.blocks(stimulus, self.left + CHOICE.inset, self.width - CHOICE.inset)
+
+        for i, count in zip(range(0, 4, plan['cols']), plan['row_counts']):
+            self.ensure(count * lead)
+            for j in range(min(plan['cols'], 4 - i)):
+                start = plan['starts'][j]
+                number = str(i + j + 1).translate(_FULLWIDTH_DIGITS)
+                self.line(self.get_lines(number, size, 24)[0], self.left + start, self.y, size)
+                for k, line in enumerate(plan['oplines'][i + j]):
+                    self.option_line(line, self.left + start + CHOICE.answer_inset(k),
+                                     self.y + k * lead, size, plan['widths'][j][bool(k)],
+                                     k + 1 == len(plan['oplines'][i + j]))
+            self.y += count * lead
+        if stimulus and after_options:
+            self.blocks(stimulus, self.left + CHOICE.inset, self.width - CHOICE.inset)
+        self.gap(float(self.gc.get('question_gap', 14.13)))
+        self.item_records.append({
+            'id': item.get('id'), 'source_number': item.get('source_number'),
+            'label': plain(label), 'pages': list(range(first, len(self.pages) + 1)),
+            'options': 4, 'columns': plan['cols'],
+            'prompt_tracking': [round(v, 5) for v in plan['prompt_tracking']],
+        })
     def listen_label(self,label,baseline,x=None):
         x=self.left if x is None else x
         atoms=measure(parse(label,True),self.catalog,20,self.section)
@@ -510,6 +545,16 @@ class ComponentLayout(MaterialPrimitives):
                 x+=18 if c.isascii() and c.isdigit() else 20
             if a.ruby:
                 for i,c in enumerate(a.ruby):self.glyph(c,10,start+i*10,baseline-18.8077,True,role='ruby-heading')
+    def listening_panel_metrics(self,item,compound=False):
+        """Use one option-row plan for opening reservation and panel drawing."""
+        option_width=self.width-21.96
+        lines=[self.hanging_lines(text,14.2,option_width,option_width) for text in item['options']]
+        if len(lines)!=4:raise ValueError('Listening choice must have four options')
+        rows=sum(map(len,lines))
+        advance=20+26.2283-14.2+rows*28.35
+        if compound:advance=max(167.4,advance+21.9717)
+        return {'option_lines':lines,'ink_height':20+26.2283+(rows-1)*28.35+14.2*.25,
+                'advance':advance}
     def listening_choice(self,item):
         example=bool(item.get('is_example'));compound=self.group['kind']=='listening_compound'
         limit=self.bottom
@@ -526,9 +571,12 @@ class ComponentLayout(MaterialPrimitives):
             if self._listen_on_page+1<count:limit=min(limit,base+pitch-31)
             self._listen_on_page+=1
         else:base=self.y+20
-        option_width=self.width-21.96
-        option_lines=[self.hanging_lines(text,14.2,option_width,option_width) for text in item['options']]
-        ink_bottom=base+26.2283+(sum(map(len,option_lines))-1)*28.35+14.2*.25
+        opening=getattr(self,'_opening_listening',None)
+        if opening is not None and opening[0] is item:
+            plan=opening[1];self._opening_listening=None
+        else:plan=self.listening_panel_metrics(item,compound)
+        option_lines=plan['option_lines']
+        ink_bottom=base-20+plan['ink_height']
         if ink_bottom>limit:
             raise ValueError('Listening panel exceeds its allocated space; reduce items_per_page or shorten its options')
         label=self.next_label(item);first=len(self.pages);self.listen_label(label,base)
@@ -590,11 +638,8 @@ class ComponentLayout(MaterialPrimitives):
             except CalibrationMismatch:pass
         size,leading=self.fs,self.leading
         self.fs=float(self.gc.get('reference_font_size',9.2));self.leading=float(self.gc.get('reference_line_height',13.68))
-        raw_outset=self.gc.get('reference_outset',16.95)
-        if isinstance(raw_outset,bool):raise ValueError('reference_outset must be a non-negative number')
-        try:outset=float(raw_outset)
-        except (TypeError,ValueError) as e:raise ValueError('reference_outset must be a non-negative number') from e
-        if outset<0 or self.left-outset<0 or self.left+self.width+outset>self.W:
+        outset=metric(self.gc,'reference_outset',16.95,allow_zero=True)
+        if self.left-outset<0 or self.left+self.width+outset>self.W:
             raise ValueError('reference_outset places material outside the page')
         try:self.blocks(stimulus,self.left-outset,self.width+2*outset)
         finally:self.fs,self.leading=size,leading
@@ -635,8 +680,16 @@ class ComponentLayout(MaterialPrimitives):
                         elif command['type']=='vector':command['pdf']=f'q {ratio} 0 0 1 {x*(1-ratio)} 0 cm\n'+command['pdf']+'\nQ'
                     for glyph in self.semantic_glyphs[glyph_start:]:glyph['x']=x+(glyph['x']-x)*ratio
                 self.y+=leading
+    def listening_memo_height(self,block):
+        height=min(metric(block,'height',260),self.usable)
+        size=metric(block,'font_size',14.2)
+        baseline=require_number(self.gc.get('memo_baseline_gap',25.1744),
+                                'memo_baseline_gap must be a finite number')
+        if plain(str(block.get('label','－メモ－'))) and height<baseline+size*.25:
+            raise ValueError('Listening memo height must contain its label; increase height or reduce its font size')
+        return height
     def _listening_memo(self,block):
-        height=min(float(block.get('height',260)),self.usable)
+        height=self.listening_memo_height(block)
         self.ensure(height)
         text=plain(str(block.get('label','－メモ－')));size=float(block.get('font_size',14.2))
         if size<=0:raise ValueError('Listening memo font size must be positive')
@@ -663,17 +716,10 @@ class ComponentLayout(MaterialPrimitives):
         title=config.get('title',group.get('title',''))
         if config.get('heading_layout','stacked')!='stacked':
             raise ValueError('Listening heading_layout must be stacked')
-        def metric(name,default):
-            raw=config.get(name,default)
-            if isinstance(raw,bool):raise ValueError(f'{name} must be a positive number')
-            try:value=float(raw)
-            except (TypeError,ValueError) as e:raise ValueError(f'{name} must be a positive number') from e
-            if value<=0:raise ValueError(f'{name} must be a positive number')
-            return value
-        heading_size=metric('heading_size',36)
-        instruction_size=metric('instruction_font_size',11.3)
-        instruction_leading=metric('instruction_line_height',25.47)
-        instruction_width=metric('instruction_width',self.width)
+        heading_size=metric(config,'heading_size',36)
+        instruction_size=metric(config,'instruction_font_size',11.3)
+        instruction_leading=metric(config,'instruction_line_height',25.47)
+        instruction_width=metric(config,'instruction_width',self.width)
         scale=heading_size/36
         self.glyph_text('もんだい',heading_size/2,self.left,self.top+.2312*scale,True,role='ruby-heading')
         self.glyph_text(plain(title),heading_size,self.left,self.top+34.0712*scale,True,role='heading')
@@ -719,10 +765,31 @@ class ComponentLayout(MaterialPrimitives):
                 if a and a.underline:self.rule(xx+size*1.1,yy-size*.9,xx+size*1.1,yy+size*.1)
         self.y+=h;self.gap(6.744)
         self._last_was_note=False;self._last_note_wrapped=False;self._last_material_kind='vertical_box'
-    def render_group(self,group,config):
-        self.group=group;self.gc=config;self.section=group['id'][0];self.group_number=int(config.get('number_start',1));self.fs=float(config.get('font_size',self.p['font_size']));self.leading=float(config.get('line_height',self.p['line_height']));self.facing_started=False
+    def template_example(self,item):
+        return False
+    def begin_group(self,group,config):
+        """Legacy groups retain their page-start contract; rules override flow."""
+        if not config.get('new_page',True) and self.page is not None and self.page['commands']:
+            raise ValueError('Same-page groups require the default rules mode; remove --precise/--recompose')
         if config.get('new_page',True) or self.page is None:self.new_page()
         else:self.add_band()
+    def group_heading(self,group,config):
+        try:
+            if not config.get('_use_measured_heading',True) or not self.measured_geometry_compatible():
+                raise CalibrationMismatch('Heading geometry changed')
+            commands,spec=self.reference.heading(group,self.left)
+            self.page['commands']+=commands;self.page['_ink']=None
+            if self.section=='L':
+                if group['kind']=='listening_memo':self.y=spec['first_item_baseline']-25.1744
+                else:self.y=spec['first_item_baseline']+18.8077-20
+            elif group['kind'] in ('choice','word_order'):self.y=spec['first_item_baseline']+.828-self.fs
+            else:self.y=spec['first_item_baseline']-self.fs
+        except CalibrationMismatch:
+            if self.section=='L':self._listening_heading(group,config)
+            else:self.dynamic_heading(group,config)
+    def render_group(self,group,config):
+        self.group=group;self.gc=config;self.section=group['id'][0];self.group_number=int(config.get('number_start',1));self.fs=float(config.get('font_size',self.p['font_size']));self.leading=float(config.get('line_height',self.p['line_height']));self.facing_started=False
+        self.begin_group(group,config)
         start=len(self.pages);ref=self.reference;can_measure=config.get('use_measured',True)
         # The same component resolver is called for every content set.
         if can_measure:
@@ -748,32 +815,20 @@ class ComponentLayout(MaterialPrimitives):
                 self.item_records.append({'id':items[0]['id'],'source_number':None,'label':'例','pages':[len(self.pages)],'options':4})
                 self.component_audit[-1]['shared_intro_page']=True
             except CalibrationMismatch:pass
-        if not skip:
-            try:
-                # Heading compatibility is independent of body composition.
-                # A changed padding or page-flow rule must not discard an
-                # otherwise exact title and instruction component.
-                if not config.get('_use_measured_heading',True) or not self.measured_geometry_compatible():raise CalibrationMismatch('Heading geometry changed')
-                commands,spec=ref.heading(group,self.left);self.page['commands']+=commands;self.page['_ink']=None
-                if self.section=='L':
-                    if group['kind']=='listening_memo':self.y=spec['first_item_baseline']-25.1744
-                    else:self.y=spec['first_item_baseline']+18.8077-20
-                elif group['kind'] in ('choice','word_order'):self.y=spec['first_item_baseline']+.828-self.fs
-                else:self.y=spec['first_item_baseline']-self.fs
-            except CalibrationMismatch:
-                if self.section=='L':self._listening_heading(group,config)
-                else:self.dynamic_heading(group,config)
-        raw_adjust=config.get('body_start_adjust',0)
-        if isinstance(raw_adjust,bool):raise ValueError('body_start_adjust must be a number')
-        try:body_start_adjust=float(raw_adjust)
-        except (TypeError,ValueError) as e:raise ValueError('body_start_adjust must be a number') from e
+        if not skip:self.group_heading(group,config)
+        body_start_adjust=require_number(config.get('body_start_adjust',0),'body_start_adjust must be a number')
         if self.y+body_start_adjust<self.top or self.y+body_start_adjust>self.bottom:
             raise ValueError('body_start_adjust places content outside the usable page')
         self.y+=body_start_adjust
         self._listen_on_page=0
         for idx,item in enumerate(items[skip:],skip):
             self._first_group_item=(idx==0)
-            if (can_measure and group['kind']=='word_order' and item.get('is_example')
+            if idx:self._split_group_opening=False
+            if self.template_example(item):
+                self.item_records.append({'id':item['id'],'source_number':None,'label':item.get('label','例'),'pages':[len(self.pages)],'options':4})
+                continue
+            if (can_measure
+                    and group['kind']=='word_order' and item.get('is_example')
                     and config.get('_use_measured_example',True) and abs(body_start_adjust)<1e-9):
                 try:
                     # The worked example is stable page furniture. Reuse it

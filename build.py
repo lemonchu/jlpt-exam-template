@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compose every exam with shared measured N1 components and one XeLaTeX renderer."""
+"""Generate exams with N1 layout rules and fixed templates; legacy precision is opt-in."""
 from pathlib import Path
 from argparse import ArgumentParser,Namespace
 import json,copy,re,shutil,sys,hashlib
@@ -26,6 +26,7 @@ from component_layout import ComponentLayout
 from reference_components import ReferenceComponents
 from calibrated_renderer import render
 from semantic_bindings import iter_questions,pointer
+from geometry import PAPER_WIDTH,PAPER_HEIGHT,require_number
 
 def load(p):
     d=yaml.safe_load(Path(p).read_text(encoding='utf-8'))
@@ -36,14 +37,6 @@ def require_schema_v1(document,path):
     version=document.get('schema_version')
     if type(version) is not int or version!=1:raise ValueError(f'{path}: schema_version must be integer 1')
     return document
-
-def require_number(value,message):
-    """Return a finite numeric value while treating YAML booleans as booleans."""
-    if isinstance(value,bool):raise ValueError(message)
-    try:number=float(value)
-    except (TypeError,ValueError) as error:raise ValueError(message) from error
-    if not number==number or abs(number)==float('inf'):raise ValueError(message)
-    return number
 
 def require_positive_integer(value,message):
     if isinstance(value,bool) or not isinstance(value,int) or value<1:raise ValueError(message)
@@ -58,9 +51,9 @@ def validate_blueprint(blueprint,path):
     page=blueprint.get('page',{})
     if not isinstance(page,dict):raise ValueError(f'{path}: page must be a mapping')
     dimensions_message=f'{path}: page width and height must be numbers'
-    width=require_number(page.get('width',595),dimensions_message)
-    height=require_number(page.get('height',842),dimensions_message)
-    if abs(width-595)>1e-6 or abs(height-842)>1e-6:
+    width=require_number(page.get('width',PAPER_WIDTH),dimensions_message)
+    height=require_number(page.get('height',PAPER_HEIGHT),dimensions_message)
+    if abs(width-PAPER_WIDTH)>1e-6 or abs(height-PAPER_HEIGHT)>1e-6:
         raise ValueError(f'{path}: the calibrated XeLaTeX renderer supports only 595 x 842 bp pages')
     numbering=blueprint.get('numbering',{})
     if not isinstance(numbering,dict):raise ValueError(f'{path}: numbering must be a mapping')
@@ -99,10 +92,36 @@ def parse_args(argv=None):
     parser.add_argument('--fonts',type=Path,default=ROOT/'fonts.yaml' if (ROOT/'fonts.yaml').is_file() else None,
                         help='Complete-font configuration; defaults to project fonts.yaml when present')
     parser.add_argument('--no-compile',action='store_true')
-    parser.add_argument('--recompose',action='store_true',help='Recompute every variable content component using the same standard typography')
+    mode=parser.add_mutually_exclusive_group()
+    mode.add_argument('--rules',dest='layout_mode',action='store_const',const='rules',
+                      help='Use the default generation rules and independent fixed templates')
+    mode.add_argument('--precise',dest='layout_mode',action='store_const',const='precise',
+                      help='Deprecated: reuse compatible A-calibrated body components, otherwise use legacy flow')
+    mode.add_argument('--recompose',dest='layout_mode',action='store_const',const='recompose',
+                      help='Deprecated: force the old flowing layout, for migration comparisons only')
+    parser.set_defaults(layout_mode='rules')
+    parser.add_argument('--output-dir',type=Path,
+                        help='Output root; defaults to output/rules, output/precise, or output/recompose by mode')
     args=parser.parse_args(argv)
     if not re.fullmatch(r'[A-Za-z0-9_-]+',args.paper):parser.error('Invalid paper folder name')
+    args.rules=args.layout_mode=='rules'
+    args.precise=args.layout_mode=='precise'
+    args.recompose=args.layout_mode=='recompose'
     return args
+
+def selected_layout_mode(args):
+    """Default to rules, including callers that construct their own Namespace."""
+    modes={'rules','precise','recompose'}
+    selected={mode for mode in modes if getattr(args,mode,False)}
+    explicit=getattr(args,'layout_mode',None)
+    if explicit is not None:
+        if explicit not in modes:raise ValueError(f'Unknown layout mode: {explicit!r}')
+        selected.add(explicit)
+    if len(selected)>1:raise ValueError('Layout modes are mutually exclusive')
+    return next(iter(selected),'rules')
+
+def output_directory(args):
+    return getattr(args,'output_dir',None) or ROOT/'output'/selected_layout_mode(args)
 
 def load_content(content):
     groups={};documents={}
@@ -160,17 +179,30 @@ def renumber_group(group,config,default_mode,next_number):
                 for key,child in value.items()}
     return rewrite_content(group)
 
-def resolve_assets(profile,metadata,content_files,layout,out):
-    assets={};resources=(ROOT/'resources').resolve()
-    for slot,spec in json.loads((profile/'asset-bindings.json').read_text()).items():
-        if 'metadata_pointer' in spec:name=pointer(metadata,spec['metadata_pointer'])
+def resolve_assets(bindings,metadata,content_files,layout,out,pages):
+    """Resolve only drawn images; generated content wins over template slots."""
+    assets={};resources=(ROOT/'resources').resolve();output=Path(out).resolve()
+    needed={command['asset'] for page in pages for command in page['commands']
+            if command['type']=='image'}
+    for slot in sorted(needed):
+        if slot in layout.assets:
+            relative=Path(slot);path=(output/relative).resolve()
+            if relative.is_absolute() or '..' in relative.parts or not path.is_relative_to(output):
+                raise ValueError(f'Unsafe generated asset path: {slot}')
         else:
-            try:name=pointer(content_files[spec['file']],spec['pointer'])
-            except (KeyError,IndexError,TypeError):continue
-        path=(resources/name).resolve()
-        if not path.is_relative_to(resources):raise ValueError(f'Unsafe asset path: {name}')
-        if path.is_file():assets[slot]=str(path)
-    for asset in layout.assets:assets[asset]=str(out/asset)
+            if slot not in bindings:raise ValueError(f'Missing asset binding: {slot}')
+            spec=bindings[slot]
+            try:
+                name=(pointer(metadata,spec['metadata_pointer']) if 'metadata_pointer' in spec
+                      else pointer(content_files[spec['file']],spec['pointer']))
+            except (KeyError,IndexError,TypeError) as error:
+                raise ValueError(f'Cannot resolve asset binding: {slot}') from error
+            if not isinstance(name,str) or not name:
+                raise ValueError(f'Asset path must be a nonempty string: {slot}')
+            path=(resources/name).resolve()
+            if not path.is_relative_to(resources):raise ValueError(f'Unsafe asset path: {name}')
+        if not path.is_file():raise FileNotFoundError(f'Current image asset is missing: {path}')
+        assets[slot]=str(path)
     return assets
 
 def printed_page(layout):
@@ -196,25 +228,25 @@ def prepare_group(source_group,entry,*,blueprint,component_defaults,
         **entry,
     }
     validate_group_config(config)
-    canonical_style={
-        **canonical_blueprint.get('group_defaults',{}),
-        **canonical_components.get(group['kind'],{}),
-        **canonical_entries.get(group['id'],{}),
-    }
-    config['use_measured']=(
-        not recompose and 'items' not in config and page_is_canonical
-        and canonicalize_config(style_config(config))
-            ==canonicalize_config(style_config(canonical_style))
-    )
-    config['_use_measured_heading']=(
-        not recompose
-        and all(config.get(key)==canonical_style.get(key) for key in HEADING_STYLE_FIELDS)
-    )
-    config['_use_measured_example']=config['use_measured']
-    config['_refresh_furniture']=(
-        blueprint.get('sidebar')!=canonical_blueprint.get('sidebar')
-        or 'sidebar' in entry or blueprint_has_header or 'footer' in blueprint
-    )
+    # Rules do not load or compare A's body calibration contracts. The old
+    # compatibility policy lives only in the explicitly selected legacy modes.
+    reuse=heading=False
+    if canonical_blueprint is not None:
+        canonical_style={
+            **canonical_blueprint.get('group_defaults',{}),
+            **canonical_components.get(group['kind'],{}),
+            **canonical_entries.get(group['id'],{}),
+        }
+        reuse=(not recompose and 'items' not in config and page_is_canonical
+               and canonicalize_config(style_config(config))
+                   ==canonicalize_config(style_config(canonical_style)))
+        heading=(not recompose
+                 and all(config.get(key)==canonical_style.get(key) for key in HEADING_STYLE_FIELDS))
+        config['_refresh_furniture']=(
+            blueprint.get('sidebar')!=canonical_blueprint.get('sidebar')
+            or 'sidebar' in entry or blueprint_has_header or 'footer' in blueprint
+        )
+    config.update(use_measured=reuse,_use_measured_heading=heading,_use_measured_example=reuse)
     if config.get('title') is not None:group['title']=config['title']
     select_items(group,config.get('items'))
     return group,config
@@ -244,15 +276,17 @@ def insert_facing_interleaf(layout,reference,metadata,group,config,*,pristine,re
 def compose_groups(*,blueprint,groups,component_defaults,contracts,layout,reference,
                    metadata,booklet,recompose,pristine,blueprint_has_header):
     """Compose the blueprint's ordered groups and return their selected content."""
-    canonical_blueprint=contracts['blueprints'][booklet]
-    canonical_components=(contracts['components'].get(booklet) or {}).get('components',{})
+    canonical_blueprint=contracts['blueprints'][booklet] if contracts is not None else None
+    canonical_components=((contracts['components'].get(booklet) or {}).get('components',{})
+                          if contracts is not None else {})
     canonical_entries={
         item['id'] if isinstance(item,dict) else item:
             item if isinstance(item,dict) else {'id':item}
-        for item in canonical_blueprint['groups']
+        for item in (canonical_blueprint or {}).get('groups',[])
     }
     page_is_canonical=(
-        canonicalize_config(blueprint.get('page'))==canonical_blueprint.get('page')
+        canonical_blueprint is not None
+        and canonicalize_config(blueprint.get('page'))==canonical_blueprint.get('page')
     )
     default_numbering=blueprint.get('numbering',{}).get('mode','continuous')
     selected=set();selected_data=[]
@@ -273,17 +307,19 @@ def compose_groups(*,blueprint,groups,component_defaults,contracts,layout,refere
         )
         if group_id in selected:raise ValueError('Duplicate group selection: '+group_id)
         start_on=config.get('start_on')
-        if start_on and not starts_on(layout,start_on):
+        same_page_rules=contracts is None and config.get('new_page',True) is False
+        if start_on and not same_page_rules and not starts_on(layout,start_on):
             use_group_layout(layout,group,config);layout.new_page()
         if config.get('sidebar',blueprint.get('sidebar')) is not False:
             config['sidebar']={
                 'text':metadata['sections'][group_id[0]]['sidebar_label'],
                 **(blueprint.get('sidebar') or {}),**(config.get('sidebar') or {}),
             }
-        insert_facing_interleaf(
-            layout,reference,metadata,group,config,
-            pristine=pristine,recompose=recompose,
-        )
+        if not same_page_rules:
+            insert_facing_interleaf(
+                layout,reference,metadata,group,config,
+                pristine=pristine,recompose=recompose,
+            )
         group=renumber_group(group,config,default_numbering,layout.number)
         layout.render_group(group,config)
         selected.add(group_id);selected_data.append(group)
@@ -300,7 +336,7 @@ def write_scene_inputs(out,pages,resolved_runs,assets):
     scene={
         'schema_version':1,
         'units':'bp',
-        'paper':{'width':595,'height':842},
+        'paper':{'width':PAPER_WIDTH,'height':PAPER_HEIGHT},
         'sections':{'booklet':{'pages':[
             {'section_page':index+1,'commands':page['commands']}
             for index,page in enumerate(pages)
@@ -330,6 +366,8 @@ def write_build_outputs(*,out,args,body_pages,pages,layout,reference,fonts,input
     report={
         'status':'BUILT','paper':args.paper,'booklet':args.booklet,
         'renderer':'shared-component-scene','body_pages':body_pages,
+        'layout_mode':selected_layout_mode(args),
+        'deprecated_layout':selected_layout_mode(args)!='rules',
         'page_count':len(pages),'original_pdf_read_at_build_time':False,
         'content_origin':'current YAML only','components':layout.component_audit,
         'compiled':not args.no_compile,
@@ -356,9 +394,13 @@ def write_build_outputs(*,out,args,body_pages,pages,layout,reference,fonts,input
 
 def main():
     args=parse_args()
+    layout_mode=selected_layout_mode(args)
+    if layout_mode!='rules':
+        print(f'Warning: --{layout_mode} is deprecated and retained for legacy comparisons. '
+              'Omit it to use the default rules layout.',file=sys.stderr)
     content=ROOT/'content'/args.paper;bp_path=args.blueprint or ROOT/'blueprints'/f'{args.booklet}.yaml'
     bp=validate_blueprint(require_schema_v1(load(bp_path),bp_path),bp_path)
-    source_blueprint=canonicalize_config(bp)
+    source_blueprint=canonicalize_config(bp) if layout_mode!='rules' else None
     blueprint_has_header='header' in bp
     metadata_path=args.metadata or (content/'metadata.yaml' if (content/'metadata.yaml').exists() else ROOT/'content/common/metadata.yaml');metadata=require_schema_v1(load(metadata_path),metadata_path)
     if metadata.get('schema_kind')!='exam_metadata':raise ValueError(f'{metadata_path}: schema_kind must be exam_metadata')
@@ -367,23 +409,37 @@ def main():
     component_data=load(component_path) if component_path else None
     component_defaults=component_data.get('components',{}) if component_data else {}
     bp.setdefault('header',metadata['booklets'][args.booklet]['subject_ja'])
-    profile=ROOT/'profiles/n1-original';ref=ReferenceComponents(profile,metadata_path)
-    out=ROOT/'output'/f'{args.paper}-{args.booklet}';out.mkdir(parents=True,exist_ok=True)
+    profile=ROOT/'profiles/n1-original'
+    if layout_mode=='rules':
+        from cover_templates import CoverTemplates
+        from rule_layout import RuleLayout
+        from rule_typography import RuleFonts
+        ref=CoverTemplates(profile,metadata_path)
+        layout_type=RuleLayout;font_type=RuleFonts
+        contracts=None;pristine=False
+    else:
+        ref=ReferenceComponents(profile,metadata_path)
+        layout_type=ComponentLayout;font_type=ComponentFonts
+        contracts=ref.contracts
+        pristine=(source_blueprint==contracts['blueprints'][args.booklet]
+                  and canonicalize_config(component_data)==contracts['components'].get(args.booklet))
+    output_root=output_directory(args)
+    out=output_root/f'{args.paper}-{args.booklet}';out.mkdir(parents=True,exist_ok=True)
+    previous_pdf=output_root/f'N1-{args.paper}-{args.booklet}.pdf'
+    if args.no_compile and previous_pdf.is_file():
+        print(f'Warning: --no-compile will not update the existing PDF: {previous_pdf}',file=sys.stderr)
     for generated_dir in ('assets','licenses'):shutil.rmtree(out/generated_dir,ignore_errors=True)
-    fonts=ComponentFonts(profile,args.fonts,ROOT);ref.fonts=fonts;layout=ComponentLayout(fonts,bp,ROOT/'resources',out,ref)
-    contracts=ref.contracts
-    pristine=(source_blueprint==contracts['blueprints'][args.booklet]
-              and canonicalize_config(component_data)==contracts['components'].get(args.booklet))
+    fonts=font_type(profile,args.fonts,ROOT);ref.fonts=fonts;layout=layout_type(fonts,bp,ROOT/'resources',out,ref)
     selected_data=compose_groups(
         blueprint=bp,groups=groups,component_defaults=component_defaults,
         contracts=contracts,layout=layout,reference=ref,metadata=metadata,
-        booklet=args.booklet,recompose=args.recompose,pristine=pristine,
+        booklet=args.booklet,recompose=layout_mode!='precise',pristine=pristine,
         blueprint_has_header=blueprint_has_header,
     )
     body_pages=len(layout.pages)
     covers=ref.cover('L' if args.booklet=='listening' else 'V',body_pages) if bp.get('cover',True) else []
     pages=covers+layout.pages
-    assets=resolve_assets(profile,metadata,content_files,layout,out)
+    assets=resolve_assets(ref.asset_bindings,metadata,content_files,layout,out,pages)
     write_scene_inputs(out,pages,ref.resolved,assets)
     render(Namespace(resources=profile,scene=out/'scene.json',resolved=out/'resolved.json',sections='booklet',output_dir=out,compile=not args.no_compile,font_config=args.fonts,project_root=ROOT))
     font_config=fonts.font_config_report['config'] if args.fonts else None
@@ -391,7 +447,7 @@ def main():
     write_build_outputs(out=out,args=args,body_pages=body_pages,pages=pages,layout=layout,
                         reference=ref,fonts=fonts,inputs=inputs,selected_data=selected_data)
     if not args.no_compile:
-        target=ROOT/'output'/f'N1-{args.paper}-{args.booklet}.pdf';shutil.copyfile(out/'main.pdf',target);print('PDF:',target)
+        target=output_root/f'N1-{args.paper}-{args.booklet}.pdf';shutil.copyfile(out/'main.pdf',target);print('PDF:',target)
     print(json.dumps({'pages':len(pages),'components':layout.component_audit},ensure_ascii=False,indent=2))
 
 if __name__=='__main__':main()

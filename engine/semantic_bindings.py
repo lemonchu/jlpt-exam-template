@@ -74,7 +74,9 @@ def layout_signature(v,semantic_values=False):
     table, image, or other layout change. Unknown non-semantic fields are kept
     deliberately, so new rendering options fail closed until calibrated.
     """
-    ignored={'id','source_number','source_pages'}
+    # Experimental editorial roles are consumed only by --rules. They do not
+    # change the legacy renderer, unlike ordinary style/indent/size options.
+    ignored={'id','source_number','source_pages','rule_style'}
     semantic={'title','instruction','prompt','text','label'}
     if isinstance(v,dict):
         result={}

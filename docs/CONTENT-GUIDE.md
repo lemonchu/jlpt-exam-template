@@ -3,12 +3,14 @@
 1. 复制 `content/paper-b/` 到新的英文目录名，例如 `content/my-exam/`。
 2. 修改 V/G/R/L YAML 中的题干、四个选项、阅读材料及注音。ID只需在本套内唯一；`source_pages` 仅供校对，不控制输出页。
 3. 复制 `blueprints/written.yaml` 或 `listening.yaml` 成自己的蓝图。按需要改变 `groups` 顺序，或用 `items` 选题。蓝图中的 `components_file` 是相对于蓝图文件的路径。
-4. 运行 `python3 build.py --paper my-exam --booklet written --blueprint blueprints/custom.yaml`，打开生成PDF逐页检查。听力改用 `--booklet listening`。
-5. 确认字体报告。现有 A/B 内容可使用内置字形直接编译。新字超出内置范围时，在 `fonts.yaml` 中配置对应完整版，并查看 `render-report.json` 确认字体；本版不注册通用替代字体，最终缺字会报错。`--fonts other-fonts.yaml` 可指定自己的同名字体路径。
+4. 先按[字体说明](FONTS.md)在 `fonts.yaml` 配置所需完整字体，再运行 `python3 build.py --paper my-exam --booklet written --blueprint blueprints/custom.yaml`。默认使用规则排版，打开 `output/rules/N1-my-exam-written.pdf` 逐页检查；听力改用 `--booklet listening`。
+5. 检查 `output/rules/my-exam-written/render-report.json`。默认 A/B 和自编内容都可能需要完整字体；缺字按提示配置，不会自动换字族。`--fonts other-fonts.yaml` 可指定独立字体配置。
 
-若要在封面显示年份场次和题册符号，在当前元数据的 `booklets.written` 或 `booklets.listening` 下填写 `session_label: "（２０２３－２）"` 和 `form_symbol: A`。两项均可选，省略、设为 `null` 或空字符串时完全不绘制；字段格式见 `SCHEMA.md`，对应字体路径见 `FONTS.md`。
+默认即规则排版，`--rules` 是别名；`--output-dir` 指定产物目录。旧 `--precise`、`--recompose` 已弃用，仅供对照，详见[排版说明](RULE-LAYOUT.md)。
 
-普通四选一用 `kind: choice`；排序题用 `word_order`。共用文章及其问题用 `reading` 或 `cloze`；听力用 `listening_choice`、`listening_compound`、`listening_memo`。格式和所有主要参数见 `SCHEMA.md`。
+封面年份与圈标在元数据 `booklets.written` 或 `booklets.listening` 下选填 `session_label: "（２０２３－２）"`、`form_symbol: A`；省略、`null` 或空字符串时不绘制。字段见[SCHEMA.md](SCHEMA.md#公共元数据)，对应字体见[FONTS.md](FONTS.md)。
+
+题型：四选一 `choice`、排序 `word_order`、公共材料 `reading`/`cloze`、听力 `listening_choice`/`listening_compound`/`listening_memo`。字段见[SCHEMA.md](SCHEMA.md)。
 
 ## 行内格式
 
@@ -25,4 +27,4 @@ text: これは{{注1|｜花弁《かべん》}}についての説明である�
 
 ## 验证编辑真实生效
 
-查看输出目录 `selected-content.yaml` 确认选题和编号，查看 `build-report.json` 确认哪些组件重新排版，再打开PDF检查。构建没有读取旧题文字的兜底；字段缺失、标记未闭合或材料超出约束会报错。不要直接修改 `content.generated.tex` 后期待下次 YAML 构建保留它。
+默认工程目录为 `output/rules/<题库>-<题册>/`：`selected-content.yaml` 记录选题和编号，`build-report.json` 记录排版模式与组件。文字来自当前 YAML；缺字段、未闭合标记或材料超限会报错。修改 `content.generated.tex` 不会保留到下次构建。

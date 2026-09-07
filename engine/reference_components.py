@@ -1,27 +1,21 @@
 """Measured component constraints: geometry and semantic field references only."""
-from pathlib import Path
-import json,copy,re
+import json,copy
 from semantic_bindings import shape,skeleton,layout_fingerprint,field_value,chars_for,normal,CalibrationMismatch
-from metadata_bindings import load_metadata, resolve_loaded
-
-BODY_MARGINS = {'L': (63.45, 45.21), 'written': (78.96, 63.63)}
+from metadata_bindings import resolve_loaded
+from geometry import body_grid
+from scene import place_fragment
+from cover_templates import CoverTemplates
 
 
 def _integer_at_least(value, minimum):
     return isinstance(value, int) and not isinstance(value, bool) and value >= minimum
 
 
-def _body_left(section, printed_page):
-    margins = BODY_MARGINS['L' if section == 'L' else 'written']
-    return margins[0 if printed_page % 2 else 1]
-
-
-class ReferenceComponents:
+class ReferenceComponents(CoverTemplates):
     def __init__(self,profile,metadata_path):
-        self.profile=Path(profile);self.metadata_path=Path(metadata_path)
+        super().__init__(profile,metadata_path)
+        self.asset_bindings=json.loads((self.profile/'asset-bindings.json').read_text())
         self.metadata_bindings=json.loads((self.profile/'metadata-bindings.json').read_text())
-        self.metadata=load_metadata(self.metadata_path,self.metadata_bindings)
-        self._metadata_cache={None:self.metadata}
         self.layout=json.loads((self.profile/'layout.json').read_text())
         self.bindings=json.loads((self.profile/'body-bindings.json').read_text())
         self.components=json.loads((self.profile/'components.json').read_text())['groups']
@@ -35,9 +29,6 @@ class ReferenceComponents:
         if not isinstance(self.layout_contracts,dict):raise ValueError('Invalid content layout contracts')
         missing=set(self.components)-set(self.layout_contracts)
         if missing:raise ValueError('Missing content layout contracts: '+', '.join(sorted(missing)))
-        self.fonts=None
-        self.metadata_audit=[]
-        self.resolved={};self.ledger=[]
     def require_layout_compatibility(self,group):
         expected=self.layout_contracts.get(group['id'])
         if expected is None:raise CalibrationMismatch('Measured component has no content layout contract')
@@ -82,34 +73,22 @@ class ReferenceComponents:
             result[rid]={'glyphs':glyphs}
         return result,ledger
     def body_runs(self,page):return [c['run_id'] for c in page['commands'] if c['type']=='run' and c['run_id'] in self.bindings['runs']]
-    def meta(self,commands,body_pages=None):
+    def meta(self,commands):
         runs=[c['run_id'] for c in commands if c['type']=='run' and c['run_id'] not in self.bindings['runs']]
-        if body_pages not in self._metadata_cache:
-            self._metadata_cache[body_pages]=load_metadata(self.metadata_path,self.metadata_bindings,body_pages)
-        return resolve_loaded(self._metadata_cache[body_pages],self.metadata_bindings,
+        return resolve_loaded(self.metadata,self.metadata_bindings,
                               self.metadata_path.name,run_ids=runs)['runs']
     def _relocated_body(self,page,section,source_number,printed_page,group_id):
         """Move measured body geometry; the caller supplies fresh page furniture."""
         if not _integer_at_least(printed_page,1):
             raise CalibrationMismatch('Printed page must be a positive integer')
-        source_left=_body_left(section,source_number)
-        target_left=_body_left(section,printed_page)
-        dx=target_left-source_left
-        # One scope preserves graphics-state changes shared by vector chunks.
-        # Clip in source coordinates before moving to the target mirror margin.
+        source_left=body_grid(section).left(source_number)
+        target_left=body_grid(section).left(printed_page)
         clip_left,clip_right=(0,595) if section=='L' else (29,565)
-        height=self.layout['paper']['height']
-        vectors='\n'.join(c['pdf'] for c in page['commands'] if c['type']=='vector')
-        commands=[]
-        if vectors:
-            commands.append({'type':'vector','pdf':(
-                f'q 1 0 0 1 {dx:.12g} 0 cm '
-                f'{clip_left} {height-785:.12g} {clip_right-clip_left} 745 re W n\n'
-                +vectors+'\nQ')})
-        for source in page['commands']:
-            if source['type']=='ink':commands.append(copy.deepcopy(source))
-            elif source['type']=='image' or (source['type']=='run' and source['run_id'] in self.bindings['runs']):
-                command=copy.deepcopy(source);command['x']+=dx;commands.append(command)
+        commands=place_fragment(
+            page['commands'],source_origin=(source_left,0),target_origin=(target_left,0),
+            page_height=self.layout['paper']['height'],clip=(clip_left,40,clip_right-clip_left,745),
+            run_ids=self.bindings['runs'],include_images=True,
+        )
         bands=[]
         if section!='L':
             bands=[{'section':section,'text':self.metadata['sections'][section]['sidebar_label']}]
@@ -150,15 +129,12 @@ class ReferenceComponents:
         if group['id'] not in self.components:raise CalibrationMismatch('New question heading')
         spec=self.components[group['id']];first=spec['pages'][0];page=self.pages[(group['id'][0],first['source_page'])]
         rr,ll=self.resolve_runs(group,spec['heading_runs'])
-        source_left=_body_left(group['id'][0],first['printed_page'])
-        dx=left-source_left;bottom=spec['heading_end_top'];commands=[]
-        for c in page['commands']:
-            c=copy.deepcopy(c)
-            if c['type']=='vector':
-                c['pdf']=f'q 1 0 0 1 {dx} 0 cm {source_left-2} {842-bottom} 520 {bottom-40} re W n\n'+c['pdf']+'\nQ'
-                commands.append(c)
-            elif c['type']=='run' and c['run_id'] in rr:c['x']+=dx;commands.append(c)
-            elif c['type']=='ink':commands.append(c)
+        source_left=body_grid(group['id'][0]).left(first['printed_page'])
+        commands=place_fragment(
+            page['commands'],source_origin=(source_left,0),target_origin=(left,0),
+            page_height=self.layout['paper']['height'],
+            clip=(source_left-2,40,520,spec['heading_end_top']-40),run_ids=rr,
+        )
         self.resolved.update(rr);self.ledger+=ll
         return commands,spec
     def slice_item(self,group,item_index,printed_page,left):
@@ -232,95 +208,12 @@ class ReferenceComponents:
                      for f in run_fields[c['run_id']])]
         if not prompts:raise CalibrationMismatch('Following item has no body text baseline')
         next_body_baseline=min(page_height-c['y'] for c in prompts)
-        source_left=_body_left(sec,source_info['printed_page'])
-        dx=float(left)-source_left
-        # Keep all vector chunks in one graphics-state scope: later chunks can
-        # inherit the original line width/dash settings from the first chunk.
-        vectors='\n'.join(c['pdf'] for c in page['commands'] if c['type']=='vector')
-        clip_left=source_left-2
-        commands=[{'type':'vector','pdf':(
-            f'q 1 0 0 1 {dx:.12g} 0 cm '
-            f'{clip_left:.12g} {page_height-clip_bottom:.12g} '
-            f'{page_width-source_left:.12g} {clip_bottom-clip_top:.12g} re W n\n'
-            +vectors+'\nQ')}]
+        source_left=body_grid(sec).left(source_info['printed_page'])
+        commands=place_fragment(
+            page['commands'],source_origin=(source_left,clip_top),target_origin=(float(left),clip_top),
+            page_height=page_height,
+            clip=(source_left-2,clip_top,page_width-source_left,clip_bottom-clip_top),run_ids=selected,
+        )
         rr,ll=self.resolve_runs(group,[c['run_id'] for c in current])
-        for source in page['commands']:
-            if source['type']=='ink':commands.append(copy.deepcopy(source))
-            elif source['type']=='run' and source['run_id'] in selected:
-                command=copy.deepcopy(source);command['x']+=dx;commands.append(command)
         self.resolved.update(rr);self.ledger+=ll
         return commands,next_body_baseline
-    def _cover_marks(self, booklet):
-        """Build optional first-page identifiers from validated metadata only."""
-        booklet_data=self.metadata.get('booklets',{}).get(booklet,{})
-        session=booklet_data.get('session_label')
-        symbol=booklet_data.get('form_symbol')
-        if session=='':session=None
-        if symbol=='':symbol=None
-        if session is not None:
-            unsafe=lambda ch: (not ch.isprintable() or ch.isspace() or
-                0xE000<=ord(ch)<=0xF8FF or 0xF0000<=ord(ch)<=0xFFFFD or 0x100000<=ord(ch)<=0x10FFFD)
-            if not isinstance(session,str) or len(session)>16 or any(unsafe(ch) for ch in session):
-                raise ValueError(f'booklets.{booklet}.session_label must be null, empty, or a short printable label without whitespace')
-        if symbol is not None and (not isinstance(symbol,str) or not re.fullmatch(r'[A-Z]',symbol)):
-            raise ValueError(f'booklets.{booklet}.form_symbol must be null or one uppercase ASCII letter')
-        if session is None and symbol is None:
-            return [],{}
-        if self.fonts is None:
-            raise ValueError('Optional cover marks require the configured component font resolver')
-
-        def centered_run(text,font,sx,sy,center_x,baseline,run_id,role,max_width=None):
-            offsets=[];advance=0.0
-            for char in text:
-                offsets.append(advance)
-                fid,code=self.fonts.resolver.resolve(font,char,'normal')
-                face=self.fonts.faces[fid]
-                advance+=face.widths[code]/face.upm*sy
-            width=advance*sx/sy
-            if max_width is not None and width>max_width+1e-7:
-                raise ValueError(f'booklets.{booklet}.session_label is {width:.2f}bp wide; maximum is {max_width:.0f}bp')
-            x=center_x-width/2
-            command={'type':'run','run_id':run_id,'font':font,'sx':sx,'sy':sy,
-                     'x':x,'y':baseline,'offsets':offsets,'slot_count':len(text),
-                     'shear':0,'forms':['normal']*len(text),'role':role}
-            return command,{run_id:{'glyphs':list(text)}}
-
-        commands=[];resolved={}
-        if session is not None:
-            command,runs=centered_run(session,self.fonts.configured('cover_session'),25.0,25.0,297.5,719.2,
-                                      f'cover-{booklet}-session-label','cover-session-label',220.0)
-            commands.append(command);resolved.update(runs)
-        if symbol is not None:
-            center_x=42.36;center_y=self.layout['paper']['height']-27.33
-            radius=29.3/2;k=radius*.552284749831
-            circle=(f'q 0.65 w 0.13725 0.12157 0.12549 RG '
-                    f'{center_x+radius:.12g} {center_y:.12g} m '
-                    f'{center_x+radius:.12g} {center_y+k:.12g} {center_x+k:.12g} {center_y+radius:.12g} {center_x:.12g} {center_y+radius:.12g} c '
-                    f'{center_x-k:.12g} {center_y+radius:.12g} {center_x-radius:.12g} {center_y+k:.12g} {center_x-radius:.12g} {center_y:.12g} c '
-                    f'{center_x-radius:.12g} {center_y-k:.12g} {center_x-k:.12g} {center_y-radius:.12g} {center_x:.12g} {center_y-radius:.12g} c '
-                    f'{center_x+k:.12g} {center_y-radius:.12g} {center_x+radius:.12g} {center_y-k:.12g} {center_x+radius:.12g} {center_y:.12g} c S Q')
-            commands.append({'type':'vector','pdf':circle})
-            # The official A/B marks are optically, not merely advance-width,
-            # centered. Other letters retain the neutral placement.
-            dx,dy={'A':(0.0,1.15),'B':(0.25,-0.3)}.get(symbol,(0.0,0.0))
-            command,runs=centered_run(symbol,self.fonts.configured('cover_symbol'),23.6,23.6,center_x+dx,806.1+dy,
-                                      f'cover-{booklet}-form-symbol','cover-form-symbol')
-            commands.append(command);resolved.update(runs)
-        return commands,resolved
-
-    def cover(self,section,body_pages):
-        booklet='listening' if section=='L' else 'written'
-        mark_commands,mark_runs=self._cover_marks(booklet)
-        pages=[]
-        for i in (1,2):
-            page=copy.deepcopy(self.pages[(section,i)])
-            if self.fonts is not None:
-                from metadata_components import resolve_metadata_components
-                page['commands'],runs,audit=resolve_metadata_components(self.profile,self.metadata_path,page['commands'],self.fonts,body_pages=body_pages)
-                self.resolved.update(runs);self.metadata_audit.append(audit)
-            else:self.resolved.update(self.meta(page['commands'],body_pages))
-            if i==1:
-                page['commands'].extend(copy.deepcopy(mark_commands))
-                self.resolved.update(mark_runs)
-            pages.append(page)
-        return pages
