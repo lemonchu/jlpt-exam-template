@@ -305,9 +305,9 @@ class StartOnTests(unittest.TestCase):
         with (
             patch.object(build, "ROOT", root),
             patch.object(build, "parse_args", return_value=args),
-            patch.object(build, "ReferenceComponents", _FakeReferenceComponents),
+            patch("reference_components.ReferenceComponents", _FakeReferenceComponents),
             patch.object(build, "ComponentFonts", _FakeFonts),
-            patch.object(build, "ComponentLayout", _FakeLayout),
+            patch("legacy_layout.LegacyLayout", _FakeLayout),
             patch.object(build, "render"),
             redirect_stdout(StringIO()),
         ):

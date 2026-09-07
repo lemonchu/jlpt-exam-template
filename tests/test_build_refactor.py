@@ -94,65 +94,27 @@ class GroupPreparationTests(unittest.TestCase):
             'sidebar':{'width':20},
             'group_defaults':{'heading_size':12,'instruction_width':300},
         }
-        self.canonical_blueprint={
-            **self.blueprint,'groups':[{'id':'V1'}],
-        }
         self.options={
             'blueprint':self.blueprint,
             'component_defaults':{'choice':{'option_gap':10}},
-            'canonical_blueprint':self.canonical_blueprint,
-            'canonical_components':{'choice':{'option_gap':10}},
-            'canonical_entries':{'V1':{'id':'V1'}},
-            'page_is_canonical':True,
-            'recompose':False,
-            'blueprint_has_header':False,
         }
 
-    def test_pristine_style_enables_measured_components_without_mutating_source(self):
+    def test_group_preparation_does_not_mutate_source_or_inject_legacy_flags(self):
         group,config=prepare_group(self.source,{'id':'V1'},**self.options)
 
         self.assertIsNot(group,self.source)
-        self.assertTrue(config['use_measured'])
-        self.assertTrue(config['_use_measured_heading'])
-        self.assertTrue(config['_use_measured_example'])
-        self.assertFalse(config['_refresh_furniture'])
+        self.assertEqual(config,{'id':'V1','heading_size':12,'instruction_width':300,'option_gap':10})
         group['items'].pop()
         self.assertEqual(len(self.source['items']),2)
 
-    def test_item_selection_disables_body_reuse_but_preserves_compatible_heading(self):
-        options={**self.options,'blueprint_has_header':True}
+    def test_item_selection_title_and_style_overrides(self):
         group,config=prepare_group(
-            self.source,{'id':'V1','items':['q2'],'title':'Custom'},**options,
+            self.source,{'id':'V1','items':['q2'],'title':'Custom','option_gap':15},**self.options,
         )
 
         self.assertEqual(group['title'],'Custom')
         self.assertEqual([item['id'] for item in group['items']],['q2'])
-        self.assertFalse(config['use_measured'])
-        self.assertTrue(config['_use_measured_heading'])
-        self.assertFalse(config['_use_measured_example'])
-        self.assertTrue(config['_refresh_furniture'])
-
-    def test_forced_legacy_flow_disables_all_measured_fragments(self):
-        _,config=prepare_group(self.source,{'id':'V1'},**{**self.options,'recompose':True})
-        self.assertFalse(config['use_measured'])
-        self.assertFalse(config['_use_measured_heading'])
-        self.assertFalse(config['_use_measured_example'])
-
-    def test_custom_heading_styles_disable_legacy_measured_fragments(self):
-        for setting in ({'heading_size':30},{'instruction_font_size':20}):
-            with self.subTest(setting=setting):
-                _,config=prepare_group(self.source,{'id':'V1',**setting},**self.options)
-                self.assertFalse(config['use_measured'])
-                self.assertFalse(config['_use_measured_heading'])
-                self.assertFalse(config['_use_measured_example'])
-
-    def test_rules_prepare_without_any_body_calibration_contracts(self):
-        options={**self.options,'recompose':True,'canonical_blueprint':None,
-                 'canonical_components':{},'canonical_entries':{},'page_is_canonical':False}
-        group,config=prepare_group(self.source,{'id':'V1','items':['q2']},**options)
-        self.assertEqual([item['id'] for item in group['items']],['q2'])
-        for flag in ('use_measured','_use_measured_heading','_use_measured_example'):
-            self.assertFalse(config[flag])
+        self.assertEqual(config['option_gap'],15)
 
 
 class FacingInterleafTests(unittest.TestCase):
@@ -167,34 +129,12 @@ class FacingInterleafTests(unittest.TestCase):
         def image(self,spec,left,width):
             self.events.append(('image',spec,left,width))
 
-    class Reference:
-        def __init__(self):
-            self.pages={('R',18):{'commands':[{'type':'text','run':'r1'}]}}
-            self.resolved={}
-
-        def meta(self,commands):
-            return {'r1':{'text':'reference'}}
-
-    def test_page_29_uses_the_calibrated_reference_interleaf(self):
-        layout=self.Layout(29);reference=self.Reference()
-        group={'id':'R7'};config={'layout':'facing_pages'}
-
-        insert_facing_interleaf(
-            layout,reference,{'assets':{}},group,config,
-            pristine=True,recompose=False,
-        )
-
-        self.assertEqual(layout.events,[])
-        self.assertTrue(layout.pages[0]['measured'])
-        self.assertEqual(layout.pages[0]['group_ids'],['R7'])
-        self.assertEqual(reference.resolved['r1']['text'],'reference')
-
     def test_custom_facing_layout_gets_a_generated_interleaf(self):
-        layout=self.Layout(1);reference=self.Reference()
+        layout=self.Layout(1)
 
         insert_facing_interleaf(
-            layout,reference,{'assets':{'reading_interleaf':'interleaf'}},
-            {'id':'R7'},{'layout':'facing_pages'},pristine=False,recompose=False,
+            layout,{'assets':{'reading_interleaf':'interleaf'}},
+            {'id':'R7'},{'layout':'facing_pages'},
         )
 
         self.assertEqual(layout.events[0],'new_page')

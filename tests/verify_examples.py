@@ -22,8 +22,8 @@ def main(argv=None):
     parser.add_argument('papers',nargs='*',default=PAPERS,
                         help='Booklet stems, e.g. paper-b-written; defaults to both A booklets')
     parser.add_argument('--expected-dir',type=Path,default=ROOT/'examples')
-    parser.add_argument('--actual-dir',type=Path,default=ROOT/'output/precise',
-                        help='Generated PDFs; defaults to output/precise for the legacy example snapshots')
+    parser.add_argument('--actual-dir',type=Path,default=ROOT/'output/rules',
+                        help='Generated PDFs; defaults to output/rules for the rule-based examples')
     args=parser.parse_args(argv)
     failures=[]
     for paper in args.papers:
