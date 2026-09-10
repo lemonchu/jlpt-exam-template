@@ -28,6 +28,18 @@ python3 build.py --paper paper-a --booklet written
 
 2014 试卷需要额外字体和文字卷蓝图，构建命令见 [2014 说明](content/paper-2014-12/README.md)。
 
+## Windows / Conda
+
+安装 Conda 和 TeX Live，确保 `xelatex`、`xdvipdfmx` 在 PATH 中。在 Conda 终端的仓库根目录执行：
+
+```powershell
+conda env create -f environment.yml
+conda activate jlpt-exam
+python build.py --paper paper-b --booklet written
+```
+
+字体配置同上；已有环境只需激活。
+
 ## 编辑与组卷
 
 | 想做什么 | 从哪里改 |
@@ -39,17 +51,13 @@ python3 build.py --paper paper-a --booklet written
 
 入门见[内容指南](docs/CONTENT-GUIDE.md)，完整字段见 [YAML 参考](docs/SCHEMA.md)。
 
-## 排版模式
+## 排版与输出
 
 默认由共享规则排正文，封面和固定排序示范使用独立模板，不套用旧 A 正文坐标。修改内容后，断行与页数可以变化；不承诺与原稿逐像素相同。
 
-| 模式 | 行为 | 默认输出目录 |
-| --- | --- | --- |
-| 无参数或 `--rules` | 当前规则排版 | `output/rules/` |
-| `--precise`（已弃用） | 旧精确兼容路径；不兼容时回退旧流排 | `output/precise/` |
-| `--recompose`（已弃用） | 旧流排，供迁移对照 | `output/recompose/` |
+`--rules` 是可省略的别名；默认输出到 `output/rules/`，`--output-dir 路径` 可覆盖目录。旧 `--precise`、`--recompose` 已移除。
 
-模式参数互斥；`--output-dir 路径` 可覆盖输出目录。旧版默认行为现在需显式加 `--precise`，仅供回归对照。构建不会更新 `examples/`。规则与限制见[排版规则](docs/RULE-LAYOUT.md)。
+构建不会更新 `examples/`。规则与限制见[排版规则](docs/RULE-LAYOUT.md)。
 
 ## 开发与测试
 

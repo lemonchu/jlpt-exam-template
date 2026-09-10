@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render all measured slots exclusively from caller-supplied semantic text."""
+"""Render a generated scene using caller-supplied semantic text."""
 import argparse,json,os,re,shutil,subprocess,sys
 from dataclasses import dataclass,field
 from pathlib import Path
@@ -140,7 +140,7 @@ def _load_inputs(args):
     out.mkdir(parents=True,exist_ok=True)
     (out/'render-report.json').unlink(missing_ok=True)
     if not args.compile:(out/'main.pdf').unlink(missing_ok=True)
-    layout=json.loads(Path(getattr(args,'scene',None) or resources/'layout.json').read_text());resolved=json.loads(Path(args.resolved).read_text())
+    layout=json.loads(Path(args.scene).read_text());resolved=json.loads(Path(args.resolved).read_text())
     if resolved.get('schema_version')!=1:raise ValueError('Unsupported resolved schema version')
     bindings=resolved.get('runs')
     if not isinstance(bindings,dict):raise ValueError('resolved.runs must be a mapping keyed by run_id')
@@ -218,10 +218,14 @@ def _compile_project(out,page_count):
     if not pdf.read_bytes().rstrip().endswith(b'%%EOF'):raise RuntimeError('Incomplete generated PDF')
     with fitz.open(pdf) as document:
         if document.is_repaired or len(document)!=page_count:raise RuntimeError('PDF page count/xref validation failed')
-    with pdf.open('rb') as stream:os.fsync(stream.fileno())
-    os.replace(pdf,out/'main.pdf');fd=os.open(out,os.O_RDONLY)
-    try:os.fsync(fd)
-    finally:os.close(fd)
+    # Windows requires a writable file handle for fsync and cannot open a
+    # directory through os.open. Keep the directory durability step on POSIX.
+    with pdf.open('r+b') as stream:os.fsync(stream.fileno())
+    os.replace(pdf,out/'main.pdf')
+    if os.name!='nt':
+        fd=os.open(out,os.O_RDONLY)
+        try:os.fsync(fd)
+        finally:os.close(fd)
 
 def _build_report(inputs,pages,state,resolver,font_policy):
     report={'status':'PASS','backend':'component-scene','pages':len(pages),'sections':inputs.sections,'resolved_runs':state.run_count,'resolved_slots':state.slot_count,'drawn_glyphs':state.drawn,'font_count':len(resolver.used),'fallback_events':resolver.fallback_events,'unbound_required_runs':[],'content_source':'resolved.runs only','layout_text_fallback':False}

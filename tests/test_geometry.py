@@ -1,5 +1,4 @@
-"""Guard the shared grid and relocation of measured and flowing content."""
-import copy
+"""Guard the shared grid and anchors across page boundaries."""
 from pathlib import Path
 from types import SimpleNamespace
 import sys
@@ -9,9 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'engine'))
 
 from component_layout import ComponentLayout
-from geometry import BODY_BOTTOM, CHOICE, LISTENING, PAPER_HEIGHT, PAPER_WIDTH, WRITTEN, metric
+from geometry import CHOICE, PAPER_HEIGHT, WRITTEN, metric
 from inline import measure, parse
-from scene import place_fragment
 
 
 class FixedCatalog:
@@ -56,18 +54,6 @@ class BodyGridTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             metric({'gap': 0}, 'gap', 10)
 
-    def test_measured_compatibility_accepts_both_parities_but_rejects_changed_grid(self):
-        for grid in (WRITTEN, LISTENING):
-            for page in (1, 2):
-                with self.subTest(grid=grid, page=page):
-                    layout = SimpleNamespace(W=PAPER_WIDTH, H=PAPER_HEIGHT, top=grid.top,
-                                             bottom=BODY_BOTTOM, fs=grid.font_size,
-                                             leading=grid.line_height, left=grid.left(page),
-                                             width=grid.width, n=lambda: page)
-                    self.assertTrue(grid.matches(layout))
-                    layout.width -= 1
-                    self.assertFalse(grid.matches(layout))
-
     def test_choice_columns_share_the_calibrated_answer_grid(self):
         self.assertEqual(CHOICE.starts(4), [16.95, 118.74, 220.53, 322.32])
         self.assertEqual(CHOICE.starts(2), [16.95, 220.53])
@@ -85,36 +71,6 @@ class BodyGridTests(unittest.TestCase):
         for columns, width in ((3, 400), (4, 100), (1, 0), (1, True)):
             with self.subTest(columns=columns, width=width), self.assertRaises(ValueError):
                 CHOICE.geometry(columns, width)
-
-
-class FragmentTests(unittest.TestCase):
-    def test_moves_only_selected_content_without_mutating_the_profile(self):
-        source = [
-            {'type': 'vector', 'pdf': '0.33 w'},
-            {'type': 'ink', 'rgb': [0, 0, 0]},
-            {'type': 'run', 'run_id': 'keep', 'x': 80, 'y': 700, 'offsets': [0, 10]},
-            {'type': 'run', 'run_id': 'other', 'x': 100, 'y': 600},
-            {'type': 'vector', 'pdf': '80 700 m 90 700 l S'},
-            {'type': 'image', 'asset': 'diagram', 'x': 90, 'y': 650},
-        ]
-        original = copy.deepcopy(source)
-        result = place_fragment(source, source_origin=(80, 100), target_origin=(60, 140),
-                                page_height=842, clip=(78, 90, 200, 100),
-                                run_ids={'keep'}, include_images=True)
-        self.assertEqual([c['type'] for c in result], ['vector', 'ink', 'run', 'image'])
-        self.assertEqual((result[2]['x'], result[2]['y']), (60, 660))
-        self.assertEqual((result[3]['x'], result[3]['y']), (70, 610))
-        # One transform and one scope keep the two vector chunks' shared state.
-        self.assertIn('1 0 0 1 -20 -40 cm 78 652 200 100 re W n', result[0]['pdf'])
-        self.assertIn('0.33 w\n80 700 m 90 700 l S', result[0]['pdf'])
-        result[2]['offsets'].append(20)
-        self.assertEqual(source, original)
-
-    def test_fragment_excludes_unselected_images_by_default(self):
-        self.assertEqual(place_fragment(
-            [{'type': 'image', 'asset': 'other', 'x': 0, 'y': 0}],
-            source_origin=(0, 0), target_origin=(20, 20), page_height=842,
-            clip=(0, 0, 100, 100), run_ids=set()), [])
 
 
 class FlowAnchorTests(unittest.TestCase):

@@ -1,7 +1,6 @@
 """Fast boundary tests for build input validation and asset planning."""
 from contextlib import redirect_stdout
 from io import StringIO
-import json
 from pathlib import Path
 from types import SimpleNamespace
 import sys
@@ -210,9 +209,8 @@ class AssetResolutionTests(unittest.TestCase):
                 self.resolve({}, slots=(asset,))
 
 
-class _FakeReferenceComponents:
+class _FakeCoverTemplates:
     def __init__(self, profile, metadata_path):
-        self.contracts = json.loads((Path(profile) / "composition-contracts.json").read_text())
         self.pages = {}
         self.resolved = {}
         self.ledger = []
@@ -286,12 +284,6 @@ class StartOnTests(unittest.TestCase):
             "sections": {"V": {"sidebar_label": "文字・語彙"}},
             "assets": {},
         })
-        contracts = {
-            "blueprints": {"written": blueprint},
-            "components": {"written": None},
-        }
-        (profile / "composition-contracts.json").write_text(json.dumps(contracts), encoding="utf-8")
-        (profile / "asset-bindings.json").write_text("{}", encoding="utf-8")
         args = SimpleNamespace(
             paper="paper-test",
             booklet="written",
@@ -299,15 +291,14 @@ class StartOnTests(unittest.TestCase):
             metadata=metadata_path,
             fonts=None,
             no_compile=True,
-            recompose=True,
         )
         _FakeLayout.instances.clear()
         with (
             patch.object(build, "ROOT", root),
             patch.object(build, "parse_args", return_value=args),
-            patch("reference_components.ReferenceComponents", _FakeReferenceComponents),
-            patch.object(build, "ComponentFonts", _FakeFonts),
-            patch("legacy_layout.LegacyLayout", _FakeLayout),
+            patch("cover_templates.CoverTemplates", _FakeCoverTemplates),
+            patch("rule_typography.RuleFonts", _FakeFonts),
+            patch("rule_layout.RuleLayout", _FakeLayout),
             patch.object(build, "render"),
             redirect_stdout(StringIO()),
         ):

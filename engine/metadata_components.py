@@ -8,7 +8,6 @@ from pathlib import Path
 from collections import defaultdict, Counter
 import copy
 import hashlib
-import json
 import re
 
 from fontTools.ttLib import TTFont
@@ -54,19 +53,6 @@ def _right(command, kind):
     # A conservative final advance; no original character is stored or read.
     final = command['sx'] * (.5 if kind.endswith('.en') or kind == 'subject_en' else 1)
     return command['x'] + (command['offsets'][-1] if command['offsets'] else 0) * ratio + final
-
-
-def _regions(layout, bindings):
-    ranges = defaultdict(list)
-    for section in layout['sections'].values():
-        for page in section['pages']:
-            for field, rows in _field_runs(page['commands'], bindings).items():
-                kind = _kind(field)
-                if kind not in ('notice.ja', 'notice.en', 'subject_ja', 'subject_en'):
-                    continue
-                for _, command, _ in rows:
-                    ranges[kind].append((command['x'], _right(command, kind)))
-    return {kind: (min(x[0] for x in boxes), max(x[1] for x in boxes)) for kind, boxes in ranges.items()}
 
 
 def _raw_field(field, metadata):
@@ -470,19 +456,16 @@ def _reflow(field_name, field, rows, metadata, metrics, regions, page_width, att
     return commands, resolved, audit
 
 
-def resolve_metadata_components(profile, metadata_path, commands, fonts, body_pages=None, *, template=None):
+def resolve_metadata_components(metadata_path, commands, fonts, body_pages=None, *, template):
     """Return (new_commands, resolved_runs, audit) for one page's commands.
 
     `fonts` accepts ComponentFonts or an already-configured Resolver. Metadata
     glyphs on a page are replaced only when that semantic field changes capacity.
     Non-metadata commands are left alone. No original PDF/content is consulted.
-    A preloaded cover template supplies bindings, paper and fit regions without
-    reading the legacy all-body layout or metadata binding files.
+    The cover template supplies its bindings, paper dimensions and fit regions.
     """
-    profile = Path(profile)
     metadata_path = Path(metadata_path)
-    bindings = (template['bindings'] if template is not None
-                else json.loads((profile / 'metadata-bindings.json').read_text()))
+    bindings = template['bindings']
     metadata = load_metadata(metadata_path, bindings, body_pages)
     by_field = _field_runs(commands, bindings)
     for booklet in ('written', 'listening'):
@@ -510,11 +493,7 @@ def resolve_metadata_components(profile, metadata_path, commands, fonts, body_pa
     paper = None
     regions = {}
     if changes:
-        if template is not None:
-            paper, regions = template['paper'], template['regions']
-        else:
-            layout = json.loads((profile / 'layout.json').read_text())
-            paper, regions = layout['paper'], _regions(layout, bindings)
+        paper, regions = template['paper'], template['regions']
     rectangles = _rectangles(commands) if changes else []
     removed_boxes = []
     for field_name, reason in changes:

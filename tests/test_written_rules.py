@@ -12,7 +12,6 @@ sys.path.insert(0, str(ROOT / 'engine'))
 from build import load
 from inline import Atom, measure, parse
 from rule_layout import RuleLayout
-from semantic_bindings import layout_fingerprint
 from written_rules import balance_instruction_tail, instruction_enumerations, expand_instruction_atoms
 
 
@@ -171,15 +170,6 @@ class WrittenRuleTests(unittest.TestCase):
             self.assertEqual(measured, [14])
             self.assertTrue(drawn)
             self.assertTrue(all(size == 14 for size in drawn))
-
-    def test_rule_only_semantic_style_does_not_change_legacy_fingerprint(self):
-        block = {'type': 'paragraph', 'text': '本文'}
-        self.assertEqual(layout_fingerprint(block),
-                         layout_fingerprint(dict(block, rule_style='quotation')))
-        self.assertNotEqual(layout_fingerprint(block),
-                            layout_fingerprint(dict(block, indent=0)))
-        self.assertNotEqual(layout_fingerprint(block),
-                            layout_fingerprint(dict(block, unknown_layout_option=True)))
 
     def test_instruction_tail_rule_keeps_ruby_cluster_and_input_unchanged(self):
         rows = [[Atom(char, width=10) for char in '本文から選びな'],

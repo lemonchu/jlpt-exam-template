@@ -61,6 +61,6 @@ sections:
     sidebar_label: 聴解
 schema_kind: exam_metadata
 assets:
-  written_back: assets/V-p02-Im1.jpeg
-  listening_back: assets/L-p02-Im1.jpeg
+  written_back: assets/cover-pattern.jpeg
+  listening_back: assets/cover-pattern.jpeg
   reading_interleaf: assets/R-p18-Im1.jpeg

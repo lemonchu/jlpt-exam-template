@@ -12,7 +12,6 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'engine'))
 
-from legacy_layout import LegacyLayout
 from rule_layout import RuleLayout
 from test_written_rules import Catalog
 
@@ -144,16 +143,6 @@ class SamePageGroupTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'nonnegative body_start_adjust'):
             layout.render_group(self.group('V2'), {'new_page': False, 'body_start_adjust': -10})
         self.assertEqual(layout.page, before)
-
-    def test_legacy_mode_rejects_unsafe_continuation_before_replacing_a_page(self):
-        layout = self.layout(LegacyLayout)
-        config = {'use_measured': False, '_use_measured_heading': False, 'sidebar': False}
-        layout.render_group(self.group(), config)
-        original = deepcopy(layout.page)
-        with self.assertRaisesRegex(ValueError, 'default rules mode'):
-            layout.render_group(self.group('V2'), dict(config, new_page=False))
-        self.assertEqual(layout.page, original)
-
 
 if __name__ == '__main__':
     unittest.main()

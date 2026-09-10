@@ -267,9 +267,7 @@ class ComponentLayout(MaterialPrimitives):
             if child.get('type')=='paragraph' and is_note:
                 end=i+1
                 while end<len(blocks) and blocks[end].get('type')=='paragraph' and self._is_note(blocks[end]):end+=1
-                need=self.reading_sequence_height(blocks[i:end],width)
-                if need<=self.usable:self.ensure(need)
-                for note in blocks[i:end]:self.block(note,self.left+offset,width)
+                self.reading_notes(blocks[i:end],self.left+offset,width)
                 i=end;continue
             prepared=dict(child)
             if child.get('type')=='paragraph':
@@ -281,6 +279,12 @@ class ComponentLayout(MaterialPrimitives):
                         if i+1==len(blocks)-1:reserve+=tail_reserve
                 prepared['_reserve_after']=reserve
             self.block(prepared,self.left+offset,width);i+=1
+    def reading_notes(self,notes,x,width):
+        # The shared default keeps the complete definition list together.
+        offset=x-self.left
+        need=self.reading_sequence_height(notes,width)
+        if need<=self.usable:self.ensure(need)
+        for note in notes:self.block(note,self.left+offset,width)
     def reading_box_padding(self,b):
         ab=b.get('_reading_ab',False)
         if self._is_cloze():
@@ -592,14 +596,17 @@ class ComponentLayout(MaterialPrimitives):
             else:self.paragraph(str(item['label']),size=11.3,leading=24.06,gap=0)
         self._last_was_note=False;self._last_note_wrapped=False
         self._last_material_kind=None
+        material_page=self.page
         self.blocks(stimulus)
-        if questions and self.gc.get('questions_new_page',self.group.get('kind')=='cloze'):
+        if questions and self.break_before_questions(material_page):
             self.new_page()
         else:
             material_gap=float(self.gc.get('material_question_gap',24.06))
             if self.section=='R' and self._last_material_kind=='citation':material_gap=float(self.gc.get('citation_question_gap',material_gap-5.2))
             self.gap(material_gap)
         for q in questions:self.choice(q)
+    def break_before_questions(self,material_page):
+        return self.gc.get('questions_new_page',self.group.get('kind')=='cloze')
     def reading_item_label(self,label):
         normalized=label.translate(_ASCII_READING_LABEL)
         m=re.fullmatch(r'\(\s*([1-9])\s*\)',normalized)

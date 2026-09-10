@@ -1,4 +1,4 @@
-"""Example snapshots follow the default rules; legacy comparisons are explicit."""
+"""Example snapshots use the default output directory or explicit baselines."""
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -12,8 +12,8 @@ class ExampleVerificationTests(unittest.TestCase):
     def test_default_and_explicit_directories(self):
         for args, expected, actual in (
             ([], verify_examples.ROOT / 'examples', verify_examples.ROOT / 'output/rules'),
-            (['--expected-dir', 'baseline/precise', '--actual-dir', 'custom/precise'],
-             Path('baseline/precise'), Path('custom/precise')),
+            (['--expected-dir', 'baseline/rules', '--actual-dir', 'custom/rules'],
+             Path('baseline/rules'), Path('custom/rules')),
         ):
             with self.subTest(args=args), patch.object(Path, 'is_file', return_value=True), \
                     patch.object(verify_examples, 'page_hashes', return_value=['page']) as hashes, \

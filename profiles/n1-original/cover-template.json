@@ -3,8 +3,8 @@
   "units": "bp",
   "paper": {"width":595,"height":842},
   "assets": {
-    "assets/V-p02-Im1.jpeg": {"metadata_pointer":"/assets/written_back"},
-    "assets/L-p02-Im1.jpeg": {"metadata_pointer":"/assets/listening_back"}
+    "written-back": {"metadata_pointer":"/assets/written_back"},
+    "listening-back": {"metadata_pointer":"/assets/listening_back"}
   },
   "sections": {
     "V": {"pages": [
@@ -68,7 +68,7 @@
       ]},
       {"section_page": 2, "commands": [
         {"type":"vector","pdf":"q\n1 i\n0.014771 841.94 595.01 -841.89 re\nW\nn"},
-        {"type":"image","asset":"assets/V-p02-Im1.jpeg","width":612.48,"height":858.96,"x":-8.6368,"y":-8.5222},
+        {"type":"image","asset":"written-back","width":612.48,"height":858.96,"x":-8.6368,"y":-8.5222},
         {"type":"vector","pdf":"Q"}
       ]}
     ]},
@@ -113,7 +113,7 @@
       ]},
       {"section_page": 2, "commands": [
         {"type":"vector","pdf":"q\n1 i\n0.014771 841.94 595.01 -841.89 re\nW\nn"},
-        {"type":"image","asset":"assets/L-p02-Im1.jpeg","width":612.48,"height":858.96,"x":-8.6368,"y":-8.5222},
+        {"type":"image","asset":"listening-back","width":612.48,"height":858.96,"x":-8.6368,"y":-8.5222},
         {"type":"vector","pdf":"Q"}
       ]}
     ]}

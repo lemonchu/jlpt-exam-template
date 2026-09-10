@@ -1,0 +1,10 @@
+name: jlpt-exam
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -r requirements.txt
+variables:
+  PYTHONUTF8: "1"

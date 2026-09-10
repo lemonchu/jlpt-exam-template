@@ -1,4 +1,4 @@
-"""One font catalog for measured and newly composed components."""
+"""Font catalog and metrics shared by layout and fixed templates."""
 from pathlib import Path
 from dataclasses import dataclass
 from functools import lru_cache

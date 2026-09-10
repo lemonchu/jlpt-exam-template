@@ -226,6 +226,35 @@ def notice_frame(config):
 class ReadingRules:
     """Mixin placed before ComponentLayout in the rules-only renderer."""
 
+    def break_before_questions(self, material_page):
+        # Keep the ordinary article/answer spread, but do not add a third
+        # page merely because a cloze article or its notes already overflowed.
+        if self._is_cloze() and self.page is not material_page:
+            return False
+        return super().break_before_questions(material_page)
+
+    def reading_notes(self, notes, x, width):
+        if not self._is_cloze():
+            return super().reading_notes(notes, x, width)
+        # Each definition may stay whole; the entire list need not move.
+        # Fit visible ink, not the unused leading after the final line.
+        offset = x - self.left
+        for note in notes:
+            _, inner = self._material_geometry(note, self.left + offset, width)
+            size, leading, bold, _, _, align, indent, before = self.paragraph_spec(note, inner)
+            rows = self._reading_rows(self.paragraph_body_text(note), inner, size, bold, align, indent)
+            needed = before + max((i * leading + row_ink_height(row, size)
+                                   for i, row in enumerate(rows)), default=0)
+            if needed <= self.usable:
+                self.ensure(needed)
+            previous = getattr(self, '_pending_note_rows', None)
+            self._pending_note_rows = note, rows
+            try:
+                self.block(note, self.left + offset, width)
+                self._last_note_wrapped = len(rows) > 1
+            finally:
+                self._pending_note_rows = previous
+
     def paragraph_indent(self, block, bold, align, width):
         style = block.get('rule_style')
         if style in ('dialogue', 'quotation', 'continuation') and 'indent' not in block:
@@ -385,7 +414,9 @@ class ReadingRules:
         grid_leading = self._paragraph_grid_leading(block, leading)
         after_title = leading - grid_leading
         origin = self.left
-        rows = self._reading_rows(text, width, size, bold, align, indent)
+        planned = getattr(self, '_pending_note_rows', None)
+        rows = (planned[1] if planned is not None and planned[0] is block
+                else self._reading_rows(text, width, size, bold, align, indent))
         for index, row in enumerate(rows):
             remaining = len(rows) - index
             need = row_ink_height(row, size)
