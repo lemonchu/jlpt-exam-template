@@ -10,7 +10,8 @@
 | `rule_layout.py`、`group_flow.py` | 默认入口、题组起排、标题与首项保留计划 |
 | `written_rules.py`、`listening_rules.py` | 标题测量与绘制、题型说明、听力和图注 |
 | `choice_rules.py`、`reading_rules.py` | 题干选项、段落、字距、小注、通知与完形框 |
-| `vertical_rules.py`、`reference_rules.py` | 竖排引用、结构化参考文档 |
+| `spread_alignment.py` | 完整材料单元试排、跨页左起、花纹隔页及审计记录 |
+| `vertical_rules.py`、`reference_rules.py`、`reference_document.py` | 竖排引用、结构化参考文档及信息表共用测量/绘制计划 |
 | `component_layout.py`、`material_primitives.py` | 共用组合、分页、编号、图片、表格与方框 |
 | `inline.py`、`geometry.py`、`rule_typography.py` | 文字单元、版心网格、字体字格与行内绘制 |
 | `cover_templates.py`、`ordering_templates.py` | 独立封面、固定排序说明与示范 |

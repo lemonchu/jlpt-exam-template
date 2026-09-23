@@ -1,0 +1,4 @@
+interface:
+  display_name: "JLPT N1 排版与验收"
+  short_description: "从 YAML 编辑与字体配置，到试卷编译、逐页视觉复核和交付报告"
+  default_prompt: "请使用 $jlpt-typeset 根据本仓库排版试卷，编译后检查分页、行距、注音和注释，并交付 PDF 与未决问题报告。"

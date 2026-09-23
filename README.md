@@ -30,6 +30,30 @@ python3 build.py --paper paper-a --booklet written
 
 2014 试卷需要额外字体和文字卷蓝图，构建命令见 [2014 说明](content/paper-2014-12/README.md)。
 
+## 使用 AI 排版
+
+仓库提供可复用技能 **`jlpt-typeset`**，入口是 [SKILL.md](.agents/skills/jlpt-typeset/SKILL.md)。包含环境与文件地图、组卷命令、完整工作流、开发模块、逐页验收清单、常见排版问题的修复方法，以及交付报告模板。
+
+在仓库中打开支持本地技能的 Codex，可通过技能选择器选择它；CLI / IDE 也可直接输入：
+
+```text
+请使用 $jlpt-typeset，把 content/my-exam 的内容生成笔试和听力 PDF。
+使用 private/fonts.yaml；成品放在 output/my-exam-review。
+生成后逐页检查版式，并交付验收报告及仍需核实的问题表。
+```
+
+`my-exam` 和字体配置需换成自己的文件。其他能够读取仓库、运行命令并查看图像的 AI，也可以直接使用下面的提示，无需特定插件：
+
+```text
+请先读取 .agents/skills/jlpt-typeset/SKILL.md，按其中按需引用的工作流和检查表，
+帮我完成本次试卷排版。缺少字体或无法进行视觉检查时，请具体说明；
+不要把仅生成 TeX、测试通过或旧 PDF 仍存在当成成品验收完成。
+```
+
+这是仓库内的技能说明，不会自行启动 AI，也不需要为排版引擎配置 API key。`SKILL.md` 承载可调用的工作流；`AGENTS.md` 通常承载长期项目约定，现有根目录文件用于本机私有记录，不随仓库发布。公开技能不依赖它。技能发现位置和调用方式见 [Codex 官方说明](https://learn.chatgpt.com/docs/build-skills)；若客户端未发现技能，可直接提供上面的文件路径。
+
+先查看 [PDF 验收清单](.agents/skills/jlpt-typeset/references/quality-checks.md) 或 [运行与交付流程](.agents/skills/jlpt-typeset/references/workflow.md)。AI 仍须实际编译并查看成品；无法核实的原文和版式必须保留在报告中。
+
 ## Windows / Conda
 
 安装 Conda 和 TeX Live，确保 `xelatex`、`xdvipdfmx` 在 PATH 中。在 Conda 终端的仓库根目录执行：
