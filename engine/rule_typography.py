@@ -1,4 +1,4 @@
-"""Relative typography for the experimental rule composer.
+"""Relative typography for the shared rule composer.
 
 No calibration scene or semantic binding is read here. The small metric table
 describes type sizes, not pages or particular words. Per-kanji ruby alignment

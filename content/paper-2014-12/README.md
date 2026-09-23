@@ -9,16 +9,16 @@
 - `R.yaml`：阅读问题 8–13，含问题 11 的 A/B 文本框和问题 13 的两张文字表格。
 - `L.yaml`：听力问题 1–5。
 
-安装依赖并确保 `xelatex` 在 `PATH` 中。本套含缺字，且启用封面年份与 A/B 圈标；先按[字体说明](../../docs/FONTS.md)配置 Ryumin、FutoGo B101、Gothic MB101 Pro R、New Century Schoolbook Roman（或 C059 Roman），再于根目录执行：
+按 [README](../../README.md#生成第一份-pdf) 安装依赖并确认 `xelatex`、`xdvipdfmx` 可用。本套含缺字，且启用封面年份与 A/B 圈标；先按[字体说明](../../docs/FONTS.md)配置 Ryumin、FutoGo B101、Gothic MB101 Pro R、New Century Schoolbook Roman（或 C059 Roman），再于根目录执行：
 
 ```sh
-python3 build.py --paper paper-2014-12 --booklet written --blueprint blueprints/2014-12-written.yaml
-python3 build.py --paper paper-2014-12 --booklet listening
+python3 build.py --paper paper-2014-12 --booklet written --blueprint blueprints/2014-12-written.yaml --fonts private/fonts.yaml
+python3 build.py --paper paper-2014-12 --booklet listening --fonts private/fonts.yaml
 ```
 
-成品：`output/rules/N1-paper-2014-12-written.pdf`、`output/rules/N1-paper-2014-12-listening.pdf`。默认读取 `fonts.yaml`，可用 `--fonts /path/to/my-fonts.yaml` 指定字体配置、`--output-dir` 改输出目录。字体无需安装到系统，也不提交 Git。
+成品：`output/rules/N1-paper-2014-12-written.pdf`、`output/rules/N1-paper-2014-12-listening.pdf`。上述 `private/fonts.yaml` 需先自行配置；`--output-dir` 可改输出根目录。
 
-默认使用规则版，`examples/` 保存已验证的规则版展示成品，不自动覆盖。旧模式与分页边界见[排版说明](../../docs/RULE-LAYOUT.md)。
+不需构建也可直接查看仓库 [笔试示例](../../examples/N1-paper-2014-12-written.pdf) / [听力示例](../../examples/N1-paper-2014-12-listening.pdf)。两份PDF不会随构建自动覆盖；分页行为见[排版说明](../../docs/RULE-LAYOUT.md)。
 
 ## 排版与校对范围
 
@@ -33,4 +33,4 @@ python3 build.py --paper paper-2014-12 --booklet listening
 
 ## 听力例题补齐
 
-问题 1、2 使用 A/B 卷相同的标准例题，各一题，共 2 道例题、8 个例题选项。例题随题型说明排在正式题之前，标记 `is_example: true`，不占正式题号；正式印刷选择题仍为 15 道。来源为 `content/paper-a/L.yaml` 的 `L1-example`、`L2-example`，已核对 B 卷文字和读音一致。复制时移除原 A 卷页码，避免将其误认为本年度 PDF 的来源页。问题 3、4 保留无印刷题目的说明与备忘区，问题 5 按说明不设练习。
+问题 1、2 借用 A/B 样题的 `L1-example`、`L2-example` 作为练习，各一题；它们不是本年度原卷转录。标记 `is_example: true`，不占正式题号，也不沿用A卷的来源页码。正式印刷选择题仍为15道。问题 3、4 保留无印刷题目的说明与备忘区，问题 5 不设练习。

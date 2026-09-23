@@ -1,4 +1,4 @@
-"""Relative reading-material rules for the experimental composition path.
+"""Relative reading-material rules for the shared composition path.
 
 The A specimen supplies typography, not content identities or page coordinates.
 Paragraphs occupy a baseline grid; fitting a row tests its ink, not the empty

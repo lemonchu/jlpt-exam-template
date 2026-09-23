@@ -1,4 +1,4 @@
-"""Validate experimental editorial roles before measuring or drawing content.
+"""Validate editorial roles before measuring or drawing content.
 
 Validate semantic roles and dimensions before composing the current content.
 Unsupported combinations fail explicitly instead of measuring one layout and

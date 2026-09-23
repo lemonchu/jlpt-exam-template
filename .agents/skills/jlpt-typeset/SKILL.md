@@ -11,7 +11,7 @@ description: "使用 jlpt-exam-template 编辑 JLPT N1 YAML、配置字体和组
 
 - 首次运行、新题库、批量出卷或交付：读 [workflow.md](references/workflow.md)，其中有文件地图、环境、命令、完整流程与交付约定。
 - 生成或修改 PDF：在动手前读 [quality-checks.md](references/quality-checks.md)，生成后执行适用检查；该文件也收录实际发生过的问题及修复入口。
-- 修改共享引擎、组件或布局参数：另读 [development.md](references/development.md)，核对模块边界和回归范围。
+- 修改共享引擎、组件或布局参数：另读 [开发与维护](../../../docs/ARCHITECTURE.md)，核对模块边界和回归范围。
 - 交付时按 [验收报告模板](assets/qa-report-template.md) 在本次输出目录写报告。仅咨询、只读审查或文档改动不必生成 PDF 或完整出卷报告。
 - 按需查仓库的 [SCHEMA](../../../docs/SCHEMA.md)、[字体说明](../../../docs/FONTS.md) 和 [排版规则](../../../docs/RULE-LAYOUT.md)，不要猜字段或照搬旧版本命令。
 

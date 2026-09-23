@@ -5,7 +5,7 @@ first-line indent displaces a line; it does not change the number of cells in
 that line.  This distinction is what lets one specification cover short and
 long instructions without embedding their original line endings.
 
-This mixin is used only by the experimental rule renderer.  Coordinates here
+This mixin is used only by the shared rule renderer.  Coordinates here
 are component dimensions and baseline offsets, never page/item lookups.
 """
 from dataclasses import dataclass, replace

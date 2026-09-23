@@ -86,15 +86,7 @@ with fitz.open(pdf) as doc:
 PY
 ```
 
-打开生成 PNG 实际查看。新卷还需完成其余所有页；PDF 页数很大时按范围分批。局部修改可用下列辅助诊断定位变化，再人工检查：
-
-```sh
-python3 tests/compare_rule_layout.py examples/N1-paper-a-written.pdf \
-  output/ai-review/N1-paper-a-written.pdf --output tmp/ai-layout-diff.json
-python3 tests/check_rule_a_rows.py --fonts private/fonts.yaml --output tmp/ai-a-rows.json
-```
-
-`compare_rule_layout.py` 不是“退出 0 即外观合格”：同页数仍可能存在差异，报告指标也不是相似度百分比。默认汇总跳过前两页，并裁去页缘/页脚的比较区域，不能据此称整页通过；页面增删后应按材料/题号对应，不能逐页错位比较。`check_rule_a_rows.py` 仅诊断 A 的既有断行，不代替其他卷或像素/内容检查。
+打开生成 PNG 实际查看。新卷还需完成其余所有页；PDF 页数很大时按范围分批。局部修改可按[开发文档的辅助诊断](../../../../docs/ARCHITECTURE.md#辅助诊断)运行差分和A卷断行检查。它们不能代替看图：同页数不代表像素相同，裁边/跳页汇总不代表整页通过；页面增删后按材料/题号对应。
 
 ## 已发生问题 → 修复路径
 
@@ -117,4 +109,4 @@ python3 tests/check_rule_a_rows.py --fonts private/fonts.yaml --output tmp/ai-a-
 | 精简浮点数后换行/字体外形改变 | 仅在scene序列化边界保持既有渲染精度；不粗舍入测量值/校准值 | 同源TeX参数一致、像素回归；保留12.00001bp等边界 |
 | 更新后打开的还是旧 PDF | 核本次退出状态、实际输出目录、compiled字段及文件摘要；重新实际编译 | 顶层旧PDF、失败后旧报告、误开examples或其它交付目录 |
 
-测试入口和扩展注意事项见 [development.md](development.md)。修复后将检查结果及残留疑点写进 [验收报告](../assets/qa-report-template.md)；未取得原文证据的内容问题不能因版式变好而销项。
+测试入口和扩展注意事项见 [开发与维护](../../../../docs/ARCHITECTURE.md)。修复后将检查结果及残留疑点写进 [验收报告](../assets/qa-report-template.md)；未取得原文证据的内容问题不能因版式变好而销项。

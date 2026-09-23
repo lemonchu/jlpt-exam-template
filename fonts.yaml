@@ -1,4 +1,5 @@
-# 默认规则排版即使处理 A/B 也可能需要完整字体；随附子集不覆盖所有文字角色。
+# 公开配置示例：复制到 private/fonts.yaml，填写后通过 --fonts 指定。
+# 即使处理 A/B 也可能需要完整字体；随附子集不覆盖所有文字角色。
 # 例如 A 文字卷的「謎」需要配置 Ryumin-regular，详见 docs/FONTS.md。
 # 填写你本地的同款完整 OTF/TTF 路径；不自动下载或替换字体。
 schema_version: 1
