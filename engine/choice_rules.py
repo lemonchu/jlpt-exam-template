@@ -250,11 +250,15 @@ class ChoiceRules:
         rows = self.hanging_lines(text, size, first, rest, atoms=atoms,
             max_negative_tracking=maximum, rigid_blanks=True,
             max_negative_blank_tracking=blank_maximum, hanging_punctuation=True)
+        hard_ends = {id(atoms[index-1]) for index, atom in enumerate(atoms)
+                     if index and atom.text == '\n'}
         result = []
         for index, row in enumerate(rows):
             width = first if index == 0 else rest
             tracking = self.line_tracking(row, width, maximum, True, blank_maximum, True) or 0.0
-            if tracking >= 0 and index + 1 < len(rows) and row and not (row[-1].underline or row[-1].text.isspace()):
+            if (tracking >= 0 and index + 1 < len(rows) and row
+                    and id(row[-1]) not in hard_ends
+                    and not (row[-1].underline or row[-1].text.isspace())):
                 gaps = justified_gaps(row, width, size)
             else:
                 gaps = punctuation_gaps(row, size)

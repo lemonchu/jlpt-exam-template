@@ -11,6 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'engine'))
 
 from inline import measure,parse
+from component_layout import ComponentLayout
 from geometry import CLOZE_BOX
 from material_primitives import MaterialPrimitives
 
@@ -57,6 +58,38 @@ class InlineReferenceTests(unittest.TestCase):
         expected=(CLOZE_BOX.width+CLOZE_BOX.suffix_width
                   +CLOZE_BOX.margin+CLOZE_BOX.closing_margin)
         self.assertAlmostEqual(measured[1].width,expected)
+
+    def test_split_reference_suffix_clears_the_last_digit_cell_at_each_scale(self):
+        class LabelCatalog(FixedCatalog):
+            @staticmethod
+            def width(char,size,bold=False,section='',role=None):
+                return size
+
+        def draw(text,size):
+            layout=object.__new__(ComponentLayout)
+            layout.catalog=LabelCatalog();layout.section='G'
+            drawn=[];frames=[]
+            def glyph(char,glyph_size,x,baseline,*args,role=None,hscale=1,**kwargs):
+                drawn.append((char,x,x+glyph_size*hscale))
+            layout.glyph=glyph;layout.rect=lambda *args:frames.append(args)
+            layout.line(measure(parse(text),layout.catalog,size),0,0,size)
+            return drawn,frames
+
+        for size in (8.475,11.3,16.95):
+            for label in ('43-a','43-b','45-a','45-b','7-A','123-Z'):
+                with self.subTest(size=size,label=label):
+                    drawn,frames=draw('〔'+label+'〕',size)
+                    suffix=next(i for i,g in enumerate(drawn) if g[0]=='-')
+                    self.assertGreaterEqual(drawn[suffix][1]-drawn[suffix-1][2],size/11.3-.000001)
+                    frame_x,_,frame_width,_=frames[0]
+                    self.assertGreater(drawn[0][1],frame_x)
+                    self.assertLess(drawn[-1][2],frame_x+frame_width)
+
+        # Ordinary number-only frames retain their calibrated positions.
+        drawn,frames=draw('〔43〕',11.3)
+        self.assertAlmostEqual(frames[0][2],33.75)
+        self.assertAlmostEqual(drawn[0][1],17.459696)
+        self.assertAlmostEqual(drawn[1][1]-drawn[0][1],5.070304)
 
 
 if __name__=='__main__':

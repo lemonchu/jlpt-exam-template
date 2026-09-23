@@ -7,7 +7,7 @@ when the heading and preferred unit cannot fit together on a fresh page.
 from contextlib import contextmanager
 
 from inline import plain
-from reading_rules import cloze_frame, notice_frame, row_ink_height
+from reading_rules import cloze_frame, notice_frame, row_ink_height, row_advance
 
 
 def keep(minimum=0.0, preferred=None, *, break_before=False, **details):
@@ -133,12 +133,24 @@ class GroupFlow:
                     height = self.reading_sequence_height(blocks[index:end], width)
                     if height <= self.usable:
                         plan = keep(height)
-                elif (index + 1 < len(blocks) and plan.get('row_count', 0) <= 2
-                      and blocks[index + 1].get('style') == 'small'
-                      and blocks[index + 1].get('align') == 'right'):
-                    height = self.reading_sequence_height(blocks[index:index + 2], width)
-                    if height <= self.usable:
+                else:
+                    annotation_tail = 0
+                    if (block.get('style') != 'small'
+                            and '\n' not in self.paragraph_body_text(block)
+                            and plan.get('row_count', 0) <= 3):
+                        annotation_tail = self.following_annotation_height(
+                            blocks, index + 1, width, 'paragraph')
+                    height = self.estimate_block(block, width) + annotation_tail if annotation_tail else 0
+                    if height and height <= self.usable:
+                        # The drawing pass reserves the whole short paragraph
+                        # with its following citation. Keep its heading too.
                         plan = keep(height)
+                    elif (index + 1 < len(blocks) and plan.get('row_count', 0) <= 2
+                          and blocks[index + 1].get('style') == 'small'
+                          and blocks[index + 1].get('align') == 'right'):
+                        height = self.reading_sequence_height(blocks[index:index + 2], width)
+                        if height <= self.usable:
+                            plan = keep(height)
             return prefix_keep(before, plan)
         return keep(before)
 
@@ -155,7 +167,20 @@ class GroupFlow:
                     ink = row_ink_height(rows[0], size) if rows else 0
                     if getattr(self, '_rule_material_style', None) == 'notice' and kind == 'heading':
                         ink = max(ink, size + 7.2)
-                    return keep(before + ink, row_count=len(rows))
+                    # Match ReadingRules.paragraph's opening keep: an ordinary
+                    # two/three-line paragraph stays whole, a longer paragraph
+                    # keeps its first two lines, and authored newlines opt out.
+                    opening = ink
+                    if block.get('style') != 'small' and '\n' not in text and len(rows) >= 2:
+                        count = len(rows) if len(rows) <= 3 else 2
+                        grid = self._paragraph_grid_leading(block, leading)
+                        last_ink = row_ink_height(rows[count - 1], size)
+                        if getattr(self, '_rule_material_style', None) == 'notice' and kind == 'heading':
+                            last_ink = max(last_ink, size + 7.2)
+                        measured = sum(row_advance(row, size, grid) for row in rows[:count - 1]) + last_ink
+                        if measured <= self.usable:
+                            opening = measured
+                    return keep(before + opening, row_count=len(rows))
                 _, leading, _, _, _, _, _, before = self.paragraph_spec(block, width)
                 return keep(before + leading)
         if kind == 'memo':
@@ -177,6 +202,8 @@ class GroupFlow:
         if kind == 'box' and block.get('rule_style') == 'guide':
             plan = self.guide_plan(block, width)
             return keep(plan.height + 1.3532)
+        if kind == 'box' and block.get('rule_style') == 'reference':
+            return keep(self.reference_document_plan(block, width).height)
         if kind == 'box':
             reading = self._uses_reading_spacing()
             special = self._is_cloze() or block.get('rule_style') == 'notice'

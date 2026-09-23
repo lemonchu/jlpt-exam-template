@@ -4,8 +4,10 @@ Validate semantic roles and dimensions before composing the current content.
 Unsupported combinations fail explicitly instead of measuring one layout and
 drawing another, or silently omitting a child of a specialized document.
 """
+import re
 from geometry import metric, require_number
 from reference_rules import TEXT_ROLES
+from reference_document import REFERENCE_TEXT_ROLES
 
 
 POSITIVE_DIMENSIONS = frozenset({
@@ -53,6 +55,13 @@ def validate_rule_content(group):
     def visit_item(item, path):
         if 'rule_style' in item:
             raise ValueError(f'{path}: rule_style belongs on a material block')
+        if 'options_embedded_in_stimulus' in item:
+            embedded=item['options_embedded_in_stimulus']
+            if type(embedded) is not bool:
+                raise ValueError(f'{path}: options_embedded_in_stimulus must be boolean')
+            if embedded and (group.get('kind') not in ('listening_choice','listening_compound')
+                             or not any(b.get('type')=='image' for b in item.get('stimulus',[]))):
+                raise ValueError(f'{path}: embedded choices require a listening stimulus image')
         visit_blocks(item.get('stimulus', []), path + '/stimulus')
         for key in ('items', 'questions'):
             for index, child in enumerate(item.get(key, [])):
@@ -63,18 +72,26 @@ def validate_rule_content(group):
             location = f'{path}/{index}'
             kind, role = block.get('type'), block.get('rule_style')
             validate_rule_dimensions(block)
+            if (nested and kind == 'paragraph' and block.get('style') == 'small'
+                    and re.match(r'^[（(]注', block.get('text', ''))):
+                raise ValueError(f'{location}: glossary definitions must be outside material boxes')
             if parent == 'guide':
                 allowed = (kind in ('paragraph', 'heading') and (role is None or role in TEXT_ROLES)
                            or kind == 'table' and role in (None, 'guide_table'))
                 if not allowed:
                     raise ValueError(f'{location}: guide supports text roles and tables only')
+            elif parent == 'reference':
+                allowed = (kind in ('paragraph', 'heading') and (role is None or role in REFERENCE_TEXT_ROLES)
+                           or kind in ('table', 'box') and role is None)
+                if not allowed:
+                    raise ValueError(f'{location}: reference supports text roles, tables and nested boxes only')
             elif role in PARAGRAPH_ROLES:
                 if kind != 'paragraph':
                     raise ValueError(f'{location}: {role} requires a paragraph')
             elif role in ('contact', 'contact_detail'):
                 if kind != 'paragraph' or parent != 'notice':
                     raise ValueError(f'{location}: {role} requires a paragraph directly inside a notice')
-            elif role in ('notice', 'guide'):
+            elif role in ('notice', 'guide', 'reference'):
                 if kind != 'box' or not reading or nested:
                     raise ValueError(f'{location}: {role} requires a top-level reading box')
             elif role == 'figure_caption':
@@ -89,7 +106,8 @@ def validate_rule_content(group):
                 if any(child.get('type') == 'vertical' for child in children):
                     if any(child.get('type') not in ('vertical', 'paragraph') for child in children):
                         raise ValueError(f'{location}: vertical quotation supports vertical text and paragraph citations only')
-                visit_blocks(children, location + '/blocks', parent=role, nested=True)
+                visit_blocks(children, location + '/blocks',
+                             parent='reference' if parent == 'reference' else role, nested=True)
             if kind == 'table':
                 weights = block.get('column_widths')
                 if weights is not None:

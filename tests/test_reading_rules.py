@@ -11,7 +11,7 @@ from component_layout import ComponentLayout
 from inline import Atom
 from reading_rules import (CompactReference, MaterialColon, MaterialDash, ReadingRules,
                            citation_parts, cloze_frame, justified_gaps, kana_compressed_gaps, punctuation_gaps,
-                           row_ink_height)
+                           row_ink_height, row_advance)
 
 
 class MonoCatalog:
@@ -54,6 +54,27 @@ class FlowProbe(ReadingRules, ComponentLayout):
 
 
 class ReadingRuleTests(unittest.TestCase):
+    def test_prose_does_not_leave_its_last_line_alone_on_the_next_page(self):
+        flow = FlowProbe()
+        size, leading = 11.3, 24.06
+        flow.y = flow.bottom - (leading + size * 1.25 + 1)
+        flow.paragraph('一二三四五六七八九十天地', width=50, size=size, leading=leading)
+        self.assertEqual(len(flow.drawn), 3)
+        self.assertEqual([r[0] for r in flow.drawn], [2, 2, 2])
+
+    def test_three_line_prose_keeps_whole_with_following_annotation_tail(self):
+        flow = FlowProbe()
+        flow.y = flow.bottom - 100
+        flow.paragraph('一二三四五六七八九十天地', width=50,
+                       size=11.3, leading=24.06, reserve_after=55)
+        self.assertEqual([r[0] for r in flow.drawn], [2, 2, 2])
+
+    def test_prose_does_not_leave_its_first_line_alone_at_the_page_bottom(self):
+        flow = FlowProbe()
+        flow.y = flow.bottom - 20
+        flow.paragraph('一二三四五六七八', width=50, size=11.3, leading=24.06)
+        self.assertEqual([r[0] for r in flow.drawn], [2, 2])
+
     def test_a_expanded_row_uses_quantized_space_and_rigid_punctuation(self):
         # A R10: its first line contains 38 base glyphs in a 39-cell measure.
         text = '暮らしの中で身近な木といえば、街路樹と公園の樹木、そして住宅の庭の木あたりで'
@@ -117,6 +138,27 @@ class ReadingRuleTests(unittest.TestCase):
         flow.paragraph('{{注|本文}}')
         self.assertEqual(flow.drawn[0][0], 2)
         self.assertGreater(row_ink_height([Atom('文', annotation='（注）')], 11.3), 19)
+
+    def test_note_ink_reserve_scales_with_the_rendered_text_size(self):
+        annotated = [Atom('文', annotation='（注1）')]
+        self.assertAlmostEqual(row_ink_height(annotated, 14.2),
+                               row_ink_height(annotated, 11.3) * 14.2 / 11.3)
+
+    def test_compact_note_row_reserves_gap_and_estimate_matches_drawing(self):
+        flow = FlowProbe()
+        flow.section = 'G'
+        flow.group = {'kind': 'cloze'}
+        flow._cloze_material_depth = 1
+        block = {'type': 'paragraph', 'text': '{{注1|本文}}。\n次の行。'}
+        flow._rule_reading_block = block
+        expected = flow.estimate_block(block, 200)
+        start = flow.y
+        flow.block(block, 0, 200)
+        self.assertAlmostEqual(flow.y - start, expected)
+        self.assertGreater(flow.drawn[1][2] - flow.drawn[0][2], 21)
+        self.assertEqual(row_advance([Atom('文')], 11.3, 19.8), 19.8)
+        marked = [Atom('文', annotation='（注）', underline=True)]
+        self.assertGreater(row_advance(marked, 11.3, 24.06), 24.06)
 
     def test_quote_leading_character_does_not_guess_editorial_indent(self):
         flow = FlowProbe()

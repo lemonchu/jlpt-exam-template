@@ -143,6 +143,15 @@ class TypographyIntegrationTests(unittest.TestCase):
         self.assertAlmostEqual(ruby[3]['x'], body[1]['x'] + (14.2 - _CJK_ADVANCES[14.2]) / 2)
         self.assertEqual([glyph.get('hscale') for glyph in ruby], [.67, .67, .67, 1, 1])
 
+    def test_underlined_note_clears_the_rule_without_moving_body_or_ruby(self):
+        layout = TypographyDouble()
+        atoms = measure(parse('__{{注6|｜言《げん》葉}}__'), layout.catalog, 11.3, 'R')
+        layout.line(atoms, 100, 200, 11.3)
+        notes = [g for g in layout.glyphs if g['size'] == 6.4]
+        self.assertEqual(''.join(g['char'] for g in notes), '（注6）')
+        self.assertTrue(all(g['baseline'] - g['size'] > 211.3 + 3 for g in notes))
+        self.assertTrue(all(abs(rule[1] - 214.3) < 1e-6 for rule in layout.rules))
+
     def test_long_ruby_reserves_space_and_moves_following_text(self):
         layout = TypographyDouble()
         layout.catalog = RuleCatalog()

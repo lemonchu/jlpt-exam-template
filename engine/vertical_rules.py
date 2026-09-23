@@ -152,6 +152,19 @@ class VerticalRules:
                 advance = self.catalog.width('文', size, False, self.section)
                 yy = top + STYLE.top_baseline * plan['scale'] + column['indent']
             for atom_index, atom in enumerate(atoms):
+                if atom.annotation:
+                    # Editorial counterpart of a horizontal below-word note:
+                    # a small left-side column starting at the annotated word.
+                    # Ruby stays on the right. Neither consumes a body cell.
+                    note_scale = size / STYLE.body_size
+                    note_size = 6.4 * note_scale
+                    note_x = xx - 6.9804 * note_scale
+                    note_y = yy - size + note_size - 3.17 * note_scale
+                    for char in atom.annotation:
+                        drawn = _VERTICAL_FORMS.get(char, char)
+                        self.glyph(drawn, note_size, note_x, note_y,
+                                   semantic_char=char if drawn != char else None)
+                        note_y += self.catalog.width('文', note_size, False, self.section)
                 for char_index, char in enumerate(atom.text):
                     drawn = _VERTICAL_FORMS.get(char, char)
                     self.glyph(drawn, size, xx, yy, atom.bold,

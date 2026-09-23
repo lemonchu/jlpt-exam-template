@@ -68,6 +68,10 @@ groups:
 
 `word_order` 使用相同字段；题干保留四空和一星，四个选项是待排序片段。听力自动编号按组重新开始，并加带注音的「番」。
 
+听力选择题也支持 `stimulus` 和 `stimulus_position`，可在选项前后显示图示。材料与选项共同占用该题面板的空间；超出时构建会报错。可调小图片 `width`，或在听力蓝图中减少 `items_per_page`。
+
+当四个带编号的选项已包含在题图中时，可设置 `options_embedded_in_stimulus: true`，避免重复打印文字选项。此时必须提供 `image` 材料，`options` 仍保留四项文字描述供内容审查；题图中的编号及图形需人工核验。
+
 ## 公共材料与关联题
 
 ```yaml
@@ -147,8 +151,9 @@ groups:
 | `start_on` | `left\|right`；同页请求检查当前页，必要时换页 |
 | `page_number_start` | 默认1；插入空白页计入输出页序 |
 | `items_per_page` | 听力每内容页题数，正整数，默认2；例题默认独立 |
+| `full_page_items` | 听力选择题组中需要独页的大图题 ID 列表；只能引用本组非例题，不能重复。其前后均分页，其余题仍使用 `items_per_page` |
 | `passages_new_page` | 是否每篇阅读另起页 |
-| `questions_new_page` | 材料之后是否另起题页；完形默认 `true`。规则版完形材料已跨页时，题目从材料末页续排；其他题型仍按此设置换页 |
+| `questions_new_page` | 材料之后是否另起题页；完形默认 `true`。规则版完形或阅读材料已跨页时，题目从材料末页续排；单页材料仍按此设置换页 |
 | `material_line_height` | 文章行距；G7默认19.8，正式选择题仍为24.05996 |
 | `heading_layout` | 听力使用 `stacked` |
 | `heading_size`、`instruction_font_size`、`instruction_line_height`、`instruction_width` | 标题与说明尺寸；说明宽度不可超过版心 |
@@ -177,7 +182,7 @@ groups:
 | `booklets.written`、`booklets.listening` | `title`、`subject_ja`、`subject_en`、`time_minutes`、`notices`，以及可选封面标识 `session_label`、`form_symbol` |
 | `notices` 每项 | 日文 `text` 和可选英文 `english`；允许 `{body_pages}` |
 | `sections.V/G/R/L.sidebar_label` | 科目侧边分区文字 |
-| `assets` | `written_back`、`listening_back`、`reading_interleaf` 等独立素材引用 |
+| `assets` | `written_back`、`listening_back`、`reading_interleaf` 等独立素材引用；有 `reading_interleaf` 时，规则版跨页完形/阅读单元自动左页起排 |
 
 范例：`content/common/metadata.yaml`。优先级为 `--metadata` > 当前题库 `metadata.yaml` > 公共文件，整份选择、不逐项合并。`{body_pages}` 取实际正文页数。
 

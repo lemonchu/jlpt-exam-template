@@ -25,7 +25,7 @@ class ComponentLayout(MaterialPrimitives):
         return self.section=='R' or self._is_cloze()
     @staticmethod
     def _is_note(block):
-        return bool(re.match(r'^[（(]注',block.get('text','')))
+        return block.get('style')=='small' and bool(re.match(r'^[（(]注',block.get('text','')))
     @staticmethod
     def _has_vertical(block):
         return any(child.get('type')=='vertical' for child in block.get('blocks',[]))
@@ -95,9 +95,16 @@ class ComponentLayout(MaterialPrimitives):
                 margin=box.margin*scale
                 frame_x=atom_x+margin
                 self.rect(frame_x,baseline+box.top_from_baseline*scale,frame_width,box.height*scale)
-                label_width=(len(reference[1])*box.digit_advance+(len(reference[2] or '')*box.suffix_advance))*scale
+                suffix_gap=0
+                if reference[2]:
+                    # The compact digit pitch is narrower than its glyph cell.
+                    # Start a split-reference suffix after that cell plus a gap.
+                    digit_width=self.catalog.width(reference[1][-1],box.label_size*scale,False,self.section,role='question-number')*.8
+                    suffix_gap=max(0,digit_width-box.digit_advance*scale)+scale
+                label_width=(len(reference[1])*box.digit_advance+(len(reference[2] or '')*box.suffix_advance))*scale+suffix_gap
                 xx=frame_x+(frame_width-label_width)/2
                 for ch in label:
+                    if ch=='-':xx+=suffix_gap
                     self.glyph(ch,box.label_size*scale,xx,baseline+box.label_from_baseline*scale,role='question-number' if ch.isdigit() else 'body',hscale=.8 if ch.isdigit() else 1)
                     xx+=(box.digit_advance if ch.isdigit() else box.suffix_advance)*scale
                 natural_x+=a.width
@@ -238,12 +245,30 @@ class ComponentLayout(MaterialPrimitives):
                 is_note=self._is_note(child);self._last_was_note=is_note
                 if is_note:
                     size,_,bold=self.paragraph_format(child)
-                    self._last_note_wrapped=len(self.get_lines(child.get('text',''),size,width,bold))>1
+                    self._last_note_wrapped=len(self.get_lines(self.paragraph_body_text(child),size,width,bold))>1
                 else:self._last_note_wrapped=False
                 self._last_material_kind=('note' if is_note else 'citation' if child.get('style')=='small' else child.get('type'))
         finally:
             self._last_was_note=saved_note;self._last_note_wrapped=saved_wrapped;self._last_material_kind=saved_kind
         return height
+    def following_annotation_height(self,blocks,start,width,predecessor):
+        """Keep the citation with the article; a glossary may start next page.
+
+        The reference booklets allow definitions above the following questions.
+        Reserving their entire height here would strand the article's final two
+        lines and leave a large empty frame on the previous page.
+        """
+        tail=[]
+        for child in blocks[start:]:
+            if (child.get('type')!='paragraph' or child.get('style')!='small'
+                    or self._is_note(child) or child.get('align')!='right'):break
+            tail.append(child)
+        if not tail:return 0
+        saved=(getattr(self,'_last_was_note',False),getattr(self,'_last_note_wrapped',False),getattr(self,'_last_material_kind',None))
+        self._last_was_note=False;self._last_note_wrapped=False;self._last_material_kind=predecessor
+        try:height=self.reading_sequence_height(tail,width)
+        finally:self._last_was_note,self._last_note_wrapped,self._last_material_kind=saved
+        return height if height+2*self.leading<=self.usable else 0
     def blocks(self,blocks,x=None,width=None,tail_reserve=0):
         if not self._uses_reading_spacing():return super().blocks(blocks,x,width)
         offset=(self.left if x is None else x)-self.left
@@ -254,12 +279,15 @@ class ComponentLayout(MaterialPrimitives):
             # element is drawn; never leave a label behind after ensure().
             if child.get('type')=='heading' and i+1<len(blocks) and blocks[i+1].get('type')=='box':
                 frame=dict(blocks[i+1],_reading_ab=True)
+                frame['_reserve_after']=self.following_annotation_height(blocks,i+2,width,'box')
                 need=19.03+self.estimate_block(frame,width)
                 keep=need if need<=self.usable else 19.03+2*self.leading+16
                 self.ensure(self.opening_keep_height(frame,keep,width,prefix=19.03,consume=False))
                 self.line(self.get_lines(child.get('text',''),11.3,width,True)[0],self.left+offset,self.y,11.3)
                 self.y+=19.03
-                self.reading_box(frame,self.left+offset,width)
+                if frame.get('rule_style')=='reference':
+                    self.block(frame,self.left+offset,width)
+                else:self.reading_box(frame,self.left+offset,width)
                 i+=2;continue
             # Definitions can stay together without dragging the citation away
             # from the preceding article. Citations are reserved by its tail.
@@ -270,9 +298,16 @@ class ComponentLayout(MaterialPrimitives):
                 self.reading_notes(blocks[i:end],self.left+offset,width)
                 i=end;continue
             prepared=dict(child)
-            if child.get('type')=='paragraph':
+            if child.get('type') in ('paragraph','box'):
                 reserve=tail_reserve if i==len(blocks)-1 else 0
-                if i+1<len(blocks) and child.get('style')!='small':
+                annotation_tail=self.following_annotation_height(blocks,i+1,width,child['type'])
+                reserve+=annotation_tail
+                if (annotation_tail and tail_reserve and all(
+                        b.get('type')=='paragraph' and b.get('style')=='small'
+                        and b.get('align')=='right' and not self._is_note(b)
+                        for b in blocks[i+1:])):
+                    reserve+=tail_reserve
+                if not annotation_tail and child.get('type')=='paragraph' and i+1<len(blocks) and child.get('style')!='small':
                     following=blocks[i+1]
                     if following.get('type')=='paragraph' and following.get('style')=='small' and following.get('align')=='right':
                         reserve+=self.estimate_block(following,width)
@@ -317,7 +352,9 @@ class ComponentLayout(MaterialPrimitives):
         first=len(self.pages)-1;start_y=self.y
         self.y+=padtop
         if cloze_material:self._cloze_material_depth=previous_depth+1
-        try:self.blocks(children,self.left+offset+inset,width-2*inset,tail_reserve=padbottom)
+        try:
+            with self.flowing_frame(padtop):
+                self.blocks(children,self.left+offset+inset,width-2*inset,tail_reserve=padbottom+(after+b['_reserve_after'] if b.get('_reserve_after') else 0))
         finally:self._cloze_material_depth=previous_depth
         self.y+=padbottom
         stroke=float(self.gc.get('material_box_stroke',1.71 if cloze_material else .33))
@@ -339,8 +376,15 @@ class ComponentLayout(MaterialPrimitives):
         else:before=0
         return size,leading,bold,is_note,small,align,indent,before
     def paragraph_body_text(self,block):
-        """Use the same below-word marker text for measurement and drawing."""
+        """Use the same note labels and below-word markers for measuring and drawing."""
         text=block.get('text','')
+        # Imported definitions often use ASCII digits, while both reference
+        # booklets reserve a Japanese cell for each single-digit note label.
+        # Normalize only the definition prefix; preserve source text, numeric
+        # quantities and the separately authored below-word annotations.
+        if block.get('style')=='small' and self._is_note(block):
+            text=re.sub(r'^[（(]注[ \t\u3000]*([0-9０-９]*)[ \t\u3000]*[）)]',
+                        lambda match:'（注'+match[1].translate(_FULLWIDTH_DIGITS)+'）',text)
         if self.section=='R' and block.get('style')!='small':
             return re.sub(r'([①②③④⑤⑥⑦⑧⑨⑩])__(.*?)__',
                           lambda match:'{{'+match[1]+'|__'+match[2]+'__}}',text)
@@ -363,7 +407,7 @@ class ComponentLayout(MaterialPrimitives):
         width=width or self.width;t=b.get('type')
         if t in ('paragraph','heading'):
             size,leading,bold,is_note,small,align,indent,before=self.paragraph_spec(b,width)
-            ls=self.hanging_lines(b.get('text',''),size,width-indent,width,bold)
+            ls=self.hanging_lines(self.paragraph_body_text(b),size,width-indent,width,bold)
             return len(ls)*leading+before
         if t=='separator':return 24.06
         if t=='box' and self._has_vertical(b):return 335
@@ -545,31 +589,66 @@ class ComponentLayout(MaterialPrimitives):
                 x+=18 if c.isascii() and c.isdigit() else 20
             if a.ruby:
                 for i,c in enumerate(a.ruby):self.glyph(c,10,start+i*10,baseline-18.8077,True,role='ruby-heading')
+    @staticmethod
+    def validate_listening_pagination(group,config):
+        if 'full_page_items' not in config:return
+        identifiers=config['full_page_items']
+        if (not isinstance(identifiers,list)
+                or any(not isinstance(identifier,str) or not identifier for identifier in identifiers)
+                or len(set(identifiers))!=len(identifiers)):
+            raise ValueError('full_page_items must be a list of unique nonempty item IDs')
+        if group.get('kind')!='listening_choice':
+            raise ValueError('full_page_items is only supported for listening choice groups')
+        available={item.get('id') for item in group.get('items',[]) if not item.get('is_example')}
+        if set(identifiers)-available:
+            raise ValueError('full_page_items must identify nonexample items in the current group')
+
     def listening_panel_metrics(self,item,compound=False):
         """Use one option-row plan for opening reservation and panel drawing."""
         option_width=self.width-21.96
         lines=[self.hanging_lines(text,14.2,option_width,option_width) for text in item['options']]
         if len(lines)!=4:raise ValueError('Listening choice must have four options')
+        embedded=item.get('options_embedded_in_stimulus',False)
+        if type(embedded) is not bool:raise ValueError('options_embedded_in_stimulus must be boolean')
+        if embedded:
+            if not any(b.get('type')=='image' for b in item.get('stimulus',[])):
+                raise ValueError('Embedded listening options require a stimulus image')
+            # Four semantic descriptions stay in the bank; numbered choices are in the image.
+            lines=[]
         rows=sum(map(len,lines))
         advance=20+26.2283-14.2+rows*28.35
+        ink_height=advance if embedded else 20+26.2283+(rows-1)*28.35+14.2*.25
+        stimulus=item.get('stimulus',[])
+        stimulus_option_gap=0
+        if stimulus:
+            if (item.get('stimulus_position')!='after_options'
+                    and stimulus[-1].get('type')=='table' and lines and lines[0]):
+                stimulus_option_gap=self.ruby_top_overhang(lines[0][0],14.2)
+            material_height=self.material_height(stimulus,option_width)
+            if item.get('stimulus_position')=='after_options':
+                ink_height=advance+material_height
+            else:ink_height+=material_height+stimulus_option_gap
+            advance+=material_height+stimulus_option_gap
         if compound:advance=max(167.4,advance+21.9717)
-        return {'option_lines':lines,'ink_height':20+26.2283+(rows-1)*28.35+14.2*.25,
-                'advance':advance}
+        return {'option_lines':lines,'ink_height':ink_height,
+                'advance':advance,'stimulus_option_gap':stimulus_option_gap}
     def listening_choice(self,item):
         example=bool(item.get('is_example'));compound=self.group['kind']=='listening_compound'
         limit=self.bottom
         if not example and not compound:
-            count=self.gc.get('items_per_page',2)
-            if isinstance(count,bool) or not isinstance(count,int) or count<1:
+            slots=self.gc.get('items_per_page',2)
+            if isinstance(slots,bool) or not isinstance(slots,int) or slots<1:
                 raise ValueError('items_per_page must be a positive integer')
-            if not getattr(self,'_listen_on_page',0) or self._listen_on_page>=count:
+            full_page=item.get('id') in self.gc.get('full_page_items',[])
+            count=1 if full_page else slots
+            if full_page or not getattr(self,'_listen_on_page',0) or self._listen_on_page>=slots:
                 self.new_page();self._listen_on_page=0
             if count==2 and abs(self.top-61.4489)<.001 and abs(self.bottom-783)<.001:
                 pitch=368.31
             else:pitch=(self.bottom-self.top)/count
             base=self.top+20+self._listen_on_page*pitch
             if self._listen_on_page+1<count:limit=min(limit,base+pitch-31)
-            self._listen_on_page+=1
+            self._listen_on_page=slots if full_page else self._listen_on_page+1
         else:base=self.y+20
         opening=getattr(self,'_opening_listening',None)
         if opening is not None and opening[0] is item:
@@ -581,21 +660,31 @@ class ComponentLayout(MaterialPrimitives):
             raise ValueError('Listening panel exceeds its allocated space; reduce items_per_page or shorten its options')
         label=self.next_label(item);first=len(self.pages);self.listen_label(label,base)
         self.y=base+26.2283-14.2
+        stimulus=item.get('stimulus',[])
+        after_options=item.get('stimulus_position')=='after_options'
+        if stimulus and not after_options:
+            self.blocks(stimulus,self.left+21.96,self.width-21.96)
+            self.gap(plan['stimulus_option_gap'])
         for i,ls in enumerate(option_lines):
             self.glyph(str(i+1),14.2,self.left,self.y+14.2,role='listening-option',hscale=.8)
             for ln in ls:self.line(ln,self.left+21.96,self.y,14.2);self.y+=28.35
+        if stimulus and after_options:
+            self.blocks(stimulus,self.left+21.96,self.width-21.96)
         if compound:self.y=max(base+167.4-20,self.y+21.9717)
         self.item_records.append({'id':item.get('id'),'source_number':item.get('source_number'),'label':plain(label),'pages':[first],'options':4})
+    def begin_passage(self,item):
+        if not getattr(self,'_first_group_item',False) and self.gc.get('passages_new_page',True):self.new_page()
     def passage(self,item):
         if self.section=='L':return self.listening_passage(item)
         if self.gc.get('layout')=='facing_pages':return self.facing(item)
         stimulus=item.get('stimulus',[]);questions=item.get('questions',[])
-        if not getattr(self,'_first_group_item',False) and self.gc.get('passages_new_page',True):self.new_page()
+        self.begin_passage(item)
         if item.get('label'):
             if self.section=='R':self.reading_item_label(str(item['label']))
             else:self.paragraph(str(item['label']),size=11.3,leading=24.06,gap=0)
         self._last_was_note=False;self._last_note_wrapped=False
         self._last_material_kind=None
+        self._glossary_only_page=None
         material_page=self.page
         self.blocks(stimulus)
         if questions and self.break_before_questions(material_page):

@@ -69,7 +69,7 @@ class GroupFlowTests(unittest.TestCase):
         self.assertEqual(result, dict(minimum=expected, preferred=expected, break_before=False))
         self.assertFalse(flow.resolved)
 
-    def test_long_reading_opening_keeps_ink_not_the_whole_article(self):
+    def test_long_reading_opening_keeps_two_lines_not_the_whole_article(self):
         flow = Probe()
         paragraph = dict(type='paragraph', text='長い本文を読みます。' * 100)
         item = dict(stimulus=[paragraph], questions=[], label='（１）')
@@ -78,8 +78,8 @@ class GroupFlowTests(unittest.TestCase):
         flow._contact_detail_inset = 73
         flow._rule_material_style = 'notice'
         result = flow.first_item_keep(dict(flow.group, items=[item]), {})
-        self.assertLess(result['minimum'], 50)
-        self.assertGreater(result['minimum'], 24.06)
+        self.assertAlmostEqual(result['minimum'], 24.06 + flow.leading + flow.fs * 1.25)
+        self.assertLess(result['minimum'], flow.usable)
         self.assertEqual(flow._contact_detail_inset, 73)
         self.assertTrue(flow._last_was_note)
         self.assertEqual(flow._last_material_kind, 'box')

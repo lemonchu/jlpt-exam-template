@@ -472,127 +472,164 @@ groups:
   items:
   - id: R13-schedule
     stimulus:
-    - type: paragraph
-      text: 就職支援行事（9月-12月）のスケジュール
-      style: bold
-      align: center
-      indent: 0
-    - type: paragraph
-      text: 就職活動を行う学生のために、各種行事を実施しています。
-      indent: 0
-    - type: paragraph
-      text: 全行事、申し込みは不要です。当日、学生証を持参のうえ、会場へお越し下さい。
-      indent: 0
-    - type: table
-      header_rows: 1
-      header_bold: false
-      header_fill: false
-      header_alignments: [center, center, center, center, center]
-      column_alignments: [center, center, center, center, left]
-      rows:
-      - - ''
-        - 日
-        - 時間
-        - 行事名
-        - 内容
-      - - ①
-        - 9月19日（金）
-        - イ
-        - 就職ガイダンス
-        - ［就職活動全般の基本的な情報］就職活動の方法やスケジュールなど
-      - - ②
-        - 9月24日（水）
-        - ア
-        - 留学生ガイダンス
-        - 留学生向けの在留資格や留学生の就職状況などの説明
-      - - ③
-        - 10月3日（金）
-        - イ
-        - 就職活動体験談（1）
-        - 広告・マスコミ業界に就職した卒業生による就職活動の体験談
-      - - ④
-        - 10月16日（水）
-        - ア
-        - 就職ガイダンス
-        - ［就職活動全般の基本的な情報］内容は9月19日と同じです
-      - - ⑤
-        - 10月23日（木）
-        - ア
-        - 留学生ガイダンス
-        - 内容は9月24日と同じです
-      - - ⑥
-        - 11月7日（金）
-        - イ
-        - 留学生マナー講座
-        - 留学生が日本で就職活動を行うにあたっての基本的なマナー講座
-      - - ⑦
-        - 11月20日（木）
-        - イ
-        - 就職活動体験談（2）
-        - 金融・証券業界に就職した卒業生による就職活動の体験談
-      - - ⑧
-        - 12月1日（月）
-        - ＊
-        - 合同企業説明会
-        - 詳細は下記参照
-      - - ⑨
-        - 12月12日（金）
-        - イ
-        - 就職活動体験談（3）
-        - 貿易・流通業界に就職した卒業生による就職活動の体験談
-      - - ⑩
-        - 12月17日（水）
-        - ＊
-        - 合同企業説明会
-        - 詳細は下記参照
-    - type: paragraph
-      text: 開催時間：ア…14:50-16:20　イ…18:30-20:00　　＊合同企業説明会は下記参照
-      indent: 0
-    - type: paragraph
-      text: 開催場所：⑥以外…緑山ホール　⑥…101教室
-      indent: 0
     - type: box
+      rule_style: reference
       blocks:
-      - type: paragraph
-        text: 注意事項
+      - type: heading
+        text: 就職支援行事（9月-12月）のスケジュール
         style: bold
         align: center
         indent: 0
+        rule_style: reference_title
       - type: paragraph
-        text: ・就職希望者（留学生含む）は、［就職ガイダンス］のどちらかに必ず出席してください。
+        text: 就職活動を行う学生のために、各種行事を実施しています。
         indent: 0
+        rule_style: reference_body
       - type: paragraph
-        text: ・［留学生ガイダンス］は希望者のみ出席してください。
+        text: 全行事、申し込みは不要です。当日、学生証を持参のうえ、会場へお越し下さい。
         indent: 0
-    - type: paragraph
-      text: 合同企業説明会について
-      style: bold
-      align: center
-      indent: 0
-    - type: paragraph
-      text: 合同企業説明会は業種別に、以下の日時に開催されます。各回、約50社が参加予定です。（途中入退場自由）
-      indent: 0
-    - type: table
-      header_rows: 1
-      header_bold: false
-      header_fill: false
-      column_alignments: [center, center, center]
-      rows:
-      - - ''
-        - 12月1日
-        - 12月17日
-      - - 16:00-17:00
-        - 金融・証券
-        - 広告・マスコミ
-      - - 17:15-18:15
-        - 広告・マスコミ
-        - メーカー・IT
-      - - 18:30-19:30
-        - 貿易・流通
-        - 教育・福祉
-    - type: paragraph
-      text: 緑山大学就職課
-      indent: 0
+        rule_style: reference_body
+      - type: table
+        header_rows: 1
+        header_bold: true
+        header_fill: false
+        header_alignments:
+        - center
+        - center
+        - center
+        - center
+        - center
+        column_alignments:
+        - center
+        - center
+        - center
+        - center
+        - left
+        rows:
+        - - ''
+          - 日
+          - 時間
+          - 行事名
+          - 内容
+        - - ①
+          - 9月19日（金）
+          - イ
+          - 就職ガイダンス
+          - ［就職活動全般の基本的な情報］就職活動の方法やスケジュールなど
+        - - ②
+          - 9月24日（水）
+          - ア
+          - 留学生ガイダンス
+          - 留学生向けの在留資格や留学生の就職状況などの説明
+        - - ③
+          - 10月3日（金）
+          - イ
+          - 就職活動体験談（1）
+          - 広告・マスコミ業界に就職した卒業生による就職活動の体験談
+        - - ④
+          - 10月16日（水）
+          - ア
+          - 就職ガイダンス
+          - ［就職活動全般の基本的な情報］内容は9月19日と同じです
+        - - ⑤
+          - 10月23日（木）
+          - ア
+          - 留学生ガイダンス
+          - 内容は9月24日と同じです
+        - - ⑥
+          - 11月7日（金）
+          - イ
+          - 留学生マナー講座
+          - 留学生が日本で就職活動を行うにあたっての基本的なマナー講座
+        - - ⑦
+          - 11月20日（木）
+          - イ
+          - 就職活動体験談（2）
+          - 金融・証券業界に就職した卒業生による就職活動の体験談
+        - - ⑧
+          - 12月1日（月）
+          - ＊
+          - 合同企業説明会
+          - 詳細は下記参照
+        - - ⑨
+          - 12月12日（金）
+          - イ
+          - 就職活動体験談（3）
+          - 貿易・流通業界に就職した卒業生による就職活動の体験談
+        - - ⑩
+          - 12月17日（水）
+          - ＊
+          - 合同企業説明会
+          - 詳細は下記参照
+        column_widths:
+        - 0.045
+        - 0.135
+        - 0.045
+        - 0.195
+        - 0.58
+      - type: paragraph
+        text: 開催時間：ア…14:50-16:20　イ…18:30-20:00　　＊合同企業説明会は下記参照
+        indent: 0
+        rule_style: reference_body
+      - type: paragraph
+        text: 開催場所：⑥以外…緑山ホール　⑥…101教室
+        indent: 0
+        rule_style: reference_body
+      - type: box
+        blocks:
+        - type: heading
+          text: 注意事項
+          style: bold
+          align: center
+          indent: 0
+          rule_style: reference_subsection
+        - type: paragraph
+          text: ・就職希望者（留学生含む）は、［就職ガイダンス］のどちらかに必ず出席してください。
+          indent: 0
+          rule_style: reference_body
+        - type: paragraph
+          text: ・［留学生ガイダンス］は希望者のみ出席してください。
+          indent: 0
+          rule_style: reference_body
+      - type: heading
+        text: 合同企業説明会について
+        style: bold
+        align: center
+        indent: 0
+        rule_style: reference_section
+      - type: paragraph
+        text: 合同企業説明会は業種別に、以下の日時に開催されます。各回、約50社が参加予定です。（途中入退場自由）
+        indent: 0
+        rule_style: reference_body
+      - type: table
+        header_rows: 1
+        header_bold: true
+        header_fill: false
+        column_alignments:
+        - center
+        - center
+        - center
+        rows:
+        - - ''
+          - 12月1日
+          - 12月17日
+        - - 16:00-17:00
+          - 金融・証券
+          - 広告・マスコミ
+        - - 17:15-18:15
+          - 広告・マスコミ
+          - メーカー・IT
+        - - 18:30-19:30
+          - 貿易・流通
+          - 教育・福祉
+        header_alignments:
+        - center
+        - center
+        - center
+      - type: paragraph
+        text: 緑山大学就職課
+        indent: 0
+        rule_style: reference_contact
     questions:
     - id: R-q69
       source_number: 69

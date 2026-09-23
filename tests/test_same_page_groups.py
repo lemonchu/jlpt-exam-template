@@ -144,5 +144,85 @@ class SamePageGroupTests(unittest.TestCase):
             layout.render_group(self.group('V2'), {'new_page': False, 'body_start_adjust': -10})
         self.assertEqual(layout.page, before)
 
+    def test_new_page_long_cloze_frame_starts_below_heading_and_continues(self):
+        layout = self.layout()
+        # The frame fits a blank page, but not below the group heading.
+        body = '日' * 1240
+        group = {'id': 'G7', 'kind': 'cloze', 'title': '問題７',
+                 'instruction': '文章を読んでください。',
+                 'items': [{'id': 'article', 'stimulus': [
+                     {'type': 'box', 'blocks': [{'type': 'paragraph', 'text': body}]}],
+                            'questions': []}]}
+        layout.render_group(group, {'new_page': True, 'sidebar': False,
+                                    'material_line_height': 19.8})
+        glyphs = layout.semantic_glyphs
+        prose = [g for g in glyphs if g['char'] == '日']
+        self.assertEqual(prose[0]['page_ref'], glyphs[0]['page_ref'])
+        self.assertGreater(len({g['page_ref'] for g in prose}), 1)
+        self.assertEqual(''.join(g['char'] for g in prose), body)
+
+    def test_natural_reading_paragraph_opening_stays_with_its_heading(self):
+        # At this cursor the old one-line preflight fits, but the renderer's
+        # two-line / whole-short-paragraph keep moves all prose to the next page.
+        for characters in (70, 100, 240):
+            with self.subTest(characters=characters):
+                layout = self.layout()
+                layout.render_group(self.group('R1'), {'sidebar': False})
+                layout.y = 673
+                before = deepcopy(layout.page)
+                group = {'id': 'R2', 'kind': 'reading', 'title': '問題２',
+                         'instruction': '文章を読んでください。', 'items': [
+                             {'id': 'article', 'stimulus': [
+                                 {'type': 'paragraph', 'text': '日' * characters}],
+                              'questions': []}]}
+                start = len(layout.semantic_glyphs)
+                layout.render_group(group, {'new_page': False, 'sidebar': False})
+                added = layout.semantic_glyphs[start:]
+                first_prose = next(glyph for glyph in added if glyph['char'] == '日')
+                self.assertEqual(first_prose['page_ref'], added[0]['page_ref'])
+                self.assertEqual(layout.pages[0], before)
+                self.assertEqual(len(layout.pages), 2)
+
+    def test_explicit_reading_newlines_keep_the_one_line_opening_policy(self):
+        layout = self.layout()
+        layout.render_group(self.group('R1'), {'sidebar': False})
+        layout.y = 673
+        page = id(layout.page)
+        group = {'id': 'R2', 'kind': 'reading', 'title': '問題２',
+                 'instruction': '文章を読んでください。', 'items': [
+                     {'id': 'article', 'stimulus': [
+                         {'type': 'paragraph', 'text': '日\n月\n火\n水'}],
+                      'questions': []}]}
+        start = len(layout.semantic_glyphs)
+        layout.render_group(group, {'new_page': False, 'sidebar': False})
+        added = layout.semantic_glyphs[start:]
+        self.assertEqual(added[0]['page_ref'], page)
+        first_prose = next(glyph for glyph in added if glyph['char'] == '日')
+        self.assertEqual(first_prose['page_ref'], page)
+
+    def test_heading_stays_with_short_article_when_glossary_continues_next_page(self):
+        for characters in (35, 70, 100):
+            with self.subTest(characters=characters):
+                layout = self.layout()
+                layout.render_group(self.group('R1'), {'sidebar': False})
+                layout.y = 590
+                original_page = id(layout.page)
+                stimulus = [
+                    {'type': 'paragraph', 'text': '日' * characters},
+                    {'type': 'paragraph', 'style': 'small', 'align': 'right', 'text': '（出典）'},
+                    *({'type': 'paragraph', 'style': 'small', 'text': f'（注{n}）説明'}
+                      for n in (1, 2, 3)),
+                ]
+                group = {'id': 'R2', 'kind': 'reading', 'title': '問題２',
+                         'instruction': '文章を読んでください。', 'items': [
+                             {'id': 'article', 'stimulus': stimulus, 'questions': []}]}
+                start = len(layout.semantic_glyphs)
+                layout.render_group(group, {'new_page': False, 'sidebar': False})
+                added = layout.semantic_glyphs[start:]
+                self.assertEqual(added[0]['page_ref'], original_page)
+                self.assertEqual({glyph['page_ref'] for glyph in added if glyph['char'] in '日出典'}, {original_page})
+                self.assertEqual({glyph['page_ref'] for glyph in added if glyph['char']=='注'}, {id(layout.pages[1])})
+                self.assertEqual(len(layout.pages), 2)
+
 if __name__ == '__main__':
     unittest.main()

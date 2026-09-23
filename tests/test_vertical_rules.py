@@ -75,6 +75,39 @@ class VerticalRuleTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'vertical_cells'):
                     layout.vertical_plan(block)
 
+    def test_note_is_visible_left_of_its_word_and_ruby_stays_right(self):
+        with tempfile.TemporaryDirectory() as directory:
+            layout = self.make_layout(directory)
+            calls = []
+            layout.glyph = lambda char, size, x, y, *a, **kw: calls.append(
+                dict(char=kw.get('semantic_char') or char, size=size, x=x, y=y))
+            block = {'type': 'box', 'blocks': [
+                {'type': 'vertical', 'text': '前{{注1|｜言葉《ことば》}}後'}]}
+            layout.vertical_box(block, layout.left, layout.width)
+            body = [g for g in calls if g['size'] == 11.3]
+            notes = [g for g in calls if g['size'] == 6.4]
+            ruby = [g for g in calls if g['size'] == 5.65]
+            self.assertEqual(''.join(g['char'] for g in body), '前言葉後')
+            self.assertEqual(''.join(g['char'] for g in notes), '（注1）')
+            self.assertTrue(all(g['x'] < body[1]['x'] for g in notes))
+            self.assertTrue(all(g['x'] > body[1]['x'] for g in ruby))
+            self.assertGreater(notes[0]['y'], body[0]['y'])
+            self.assertLess(notes[0]['y'], body[1]['y'])
+
+    def test_wrapped_annotated_word_keeps_one_note_at_its_first_column(self):
+        with tempfile.TemporaryDirectory() as directory:
+            layout = self.make_layout(directory)
+            layout.gc['vertical_cells'] = 5
+            plain = {'blocks': [{'type': 'vertical', 'text': '前前前言葉後'}]}
+            annotated = {'blocks': [{'type': 'vertical', 'text': '前前前{{注|言葉}}後'}]}
+            old = layout.vertical_plan(plain)
+            new = layout.vertical_plan(annotated)
+            rows = lambda plan: [''.join(a.text for a in c['atoms']) for c in plan['columns']]
+            self.assertEqual(rows(old), rows(new))
+            self.assertEqual(rows(new), ['前前前言', '葉後'])
+            marked = [(i, a.text) for i,c in enumerate(new['columns']) for a in c['atoms'] if a.annotation]
+            self.assertEqual(marked, [(0, '言')])
+
     def test_unsupported_children_cannot_disappear_from_vertical_frame(self):
         with tempfile.TemporaryDirectory() as directory:
             layout = self.make_layout(directory)

@@ -14,7 +14,7 @@ GROUP_BOOLEAN_FIELDS=(
 )
 BOOKLET_SECTIONS={'written':{'V','G','R'},'listening':{'L'}}
 sys.path.insert(0,str(ROOT/'engine'))
-from calibrated_renderer import render
+from calibrated_renderer import compact_scene_numbers,render
 from semantic_bindings import iter_questions,pointer
 from geometry import PAPER_WIDTH,PAPER_HEIGHT,require_number
 
@@ -206,6 +206,7 @@ def insert_facing_interleaf(layout,metadata,group,config):
 
 def compose_groups(*,blueprint,groups,component_defaults,layout,metadata,booklet):
     """Compose the blueprint's ordered groups and return their selected content."""
+    layout.reading_interleaf=metadata.get('assets',{}).get('reading_interleaf')
     default_numbering=blueprint.get('numbering',{}).get('mode','continuous')
     selected=set();selected_data=[]
     for raw_entry in blueprint['groups']:
@@ -253,7 +254,7 @@ def write_scene_inputs(out,pages,resolved_runs,assets):
         ]}},
     }
     resolved={'schema_version':1,'runs':resolved_runs,'asset_files':assets}
-    write_json(out/'scene.json',scene)
+    write_json(out/'scene.json',compact_scene_numbers(scene))
     write_json(out/'resolved.json',resolved)
 
 def archive_inputs(out,content,blueprint_path,metadata_path,component_path,font_config):
@@ -286,6 +287,7 @@ def write_build_outputs(*,out,args,body_pages,pages,layout,reference,fonts,input
         },
     }
     write_json(out/'build-report.json',report,indent=2)
+    write_json(out/'material-spreads.json',getattr(layout,'material_spread_audit',[]),indent=2)
     write_json(out/'semantic-ledger.json',reference.ledger)
     write_json(out/'metadata-layout-report.json',reference.metadata_audit,indent=2)
     (out/'selected-content.yaml').write_text(yaml.safe_dump(

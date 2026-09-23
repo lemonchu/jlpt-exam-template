@@ -10,8 +10,8 @@ from math import ceil, floor
 import re
 
 from geometry import CLOZE_BOX, metric
-from inline import Atom, measure, parse, plain, REFERENCE_BOX_RE
-from rule_typography import MaterialNumber, material_number_atoms
+from inline import Atom, NetworkAddress, address_fragments, measure, parse, plain, OPEN, CLOSE, REFERENCE_BOX_RE
+from rule_typography import MaterialNumber, material_number_atoms, note_baseline_offset
 
 
 RIGID_PUNCTUATION = frozenset('、。，．・：；？！「」『』（）()[]｛｝【】〈〉《》〔〕')
@@ -30,6 +30,14 @@ class MaterialColon(Atom):
 @dataclass
 class MaterialDash(Atom):
     """An uninterrupted editorial dash is a vector, not a font-specific glyph."""
+
+
+class ReadingRow(list):
+    """An atom list retaining whether its author explicitly ended the line."""
+
+    def __init__(self, atoms, *, explicit_break=False):
+        super().__init__(atoms)
+        self.explicit_break = explicit_break
 
 
 def punctuation_gaps(atoms, size):
@@ -71,8 +79,8 @@ def justified_gaps(atoms, width, size, *, hanging=True):
                 and not left.text[-1].isspace() and not right.text[0].isspace()
                 and left.text[-1] not in RIGID_PUNCTUATION
                 and right.text[0] not in RIGID_PUNCTUATION
-                and not isinstance(left, (MaterialNumber, MaterialLatin))
-                and not isinstance(right, (MaterialNumber, MaterialLatin))]
+                and not isinstance(left, (MaterialNumber, MaterialLatin, NetworkAddress))
+                and not isinstance(right, (MaterialNumber, MaterialLatin, NetworkAddress))]
     if slack <= 0.02 or not eligible:
         return gaps
     quantum = size * 0.0159
@@ -162,9 +170,17 @@ def kana_compressed_gaps(atoms, width, size, *, maximum_em=.04):
 def row_ink_height(atoms, size):
     """Conservative ink below the row top, including below-word notes."""
     below_baseline = size * 0.25
-    if any(getattr(atom, 'annotation', '') for atom in atoms):
-        below_baseline = max(below_baseline, 6.98 + 6.4 * 0.25)
+    for atom in atoms:
+        if getattr(atom, 'annotation', ''):
+            below_baseline = max(below_baseline, note_baseline_offset(atom, size) + 6.4 * 0.25 * size / 11.3)
     return size + below_baseline
+
+
+def row_advance(atoms, size, leading):
+    """Reserve a small visible gap after notes, also on a compact cloze grid."""
+    if any(getattr(atom, 'annotation', '') for atom in atoms):
+        return max(leading, row_ink_height(atoms, size) + 2.0 * size / 11.3)
+    return leading
 
 
 def citation_parts(text):
@@ -227,15 +243,26 @@ class ReadingRules:
     """Mixin placed before ComponentLayout in the rules-only renderer."""
 
     def break_before_questions(self, material_page):
-        # Keep the ordinary article/answer spread, but do not add a third
-        # page merely because a cloze article or its notes already overflowed.
-        if self._is_cloze() and self.page is not material_page:
+        # A page containing only continued definitions can take the questions,
+        # as in the reference booklets; it needs no extra material/answer split.
+        if (self.page is getattr(self, '_glossary_only_page', None)
+                and getattr(self, '_last_material_kind', None) == 'note'):
+            return False
+        # A continued article can share its final page with the questions.
+        # The specimen's article/answer spread applies to one-page articles;
+        # overflowing prose is not a reason to force a third page. The choice
+        # renderer still moves a question when the remaining space is too small.
+        if self.page is not material_page:
             return False
         return super().break_before_questions(material_page)
 
     def reading_notes(self, notes, x, width):
+        first_page = self.page
         if not self._is_cloze():
-            return super().reading_notes(notes, x, width)
+            result = super().reading_notes(notes, x, width)
+            if self.page is not first_page:
+                self._glossary_only_page = self.page
+            return result
         # Each definition may stay whole; the entire list need not move.
         # Fit visible ink, not the unused leading after the final line.
         offset = x - self.left
@@ -254,6 +281,8 @@ class ReadingRules:
                 self._last_note_wrapped = len(rows) > 1
             finally:
                 self._pending_note_rows = previous
+        if self.page is not first_page:
+            self._glossary_only_page = self.page
 
     def paragraph_indent(self, block, bold, align, width):
         style = block.get('rule_style')
@@ -321,6 +350,7 @@ class ReadingRules:
                 continue
             inset = indent if index == 0 else 0
             gaps = (justified_gaps(row, width - inset, size) if index + 1 < len(rows)
+                    and not getattr(row, 'explicit_break', False)
                     else punctuation_gaps(row, size))
             prefix_width = sum(atom.width for atom in row[:postal]) + sum(gaps[:postal])
             self._contact_detail_inset = max(0.0, inset + prefix_width - size / 2)
@@ -328,6 +358,8 @@ class ReadingRules:
 
     def block(self, block, x=None, width=None):
         previous = getattr(self, '_rule_reading_block', None)
+        if block.get('type') in ('paragraph', 'heading', 'box') and block.get('style') != 'small':
+            self._glossary_only_page = None
         if self._uses_reading_spacing() and block.get('type') in ('paragraph', 'heading'):
             self._rule_reading_block = block
         x, width = self._material_geometry(block, self.left if x is None else x,
@@ -354,7 +386,7 @@ class ReadingRules:
         # Route the printable ASCII colon before font measurement. Its semantic
         # fullwidth spelling must not require an unused glyph in a sample subset.
         source = [MaterialColon(**{**vars(atom), 'text': ':'}) if atom.text == '：' and not atom.ruby
-                  else atom for atom in parse(text, bold)]
+                  else atom for atom in parse(text, bold, preserve_addresses=True)]
         measured = measure(source, self.catalog, size, self.section)
         measured = [replace(atom, text='：', width=size * (1.0298 if atom.bold else .9874))
                     if isinstance(atom, MaterialColon) else atom for atom in measured]
@@ -385,16 +417,52 @@ class ReadingRules:
         small = block.get('style') == 'small'
         def atoms_for(part):
             return self._material_atoms(part, size, bold, small)
+        def wrap(atoms, first_width, hanging=False):
+            # Breaking the measured atoms, rather than the markup text, keeps
+            # bold/underline spans that cross a newline intact. Subsequent
+            # authored lines retain the existing zero continuation indent.
+            parts = [[]]
+            for atom in atoms:
+                if atom.text == '\n':
+                    parts.append([])
+                else:
+                    parts[-1].append(atom)
+            if len(parts) > 1 and not parts[-1]:
+                parts.pop()  # A trailing newline ends a row; it adds no blank row.
+            rows = []
+            for index, part in enumerate(parts):
+                first = width if rows else first_width
+                expanded = []
+                for pos, atom in enumerate(part):
+                    measure_width = min(first, width)
+                    if isinstance(atom, NetworkAddress):
+                        # Kinsoku moves adjacent brackets together with their
+                        # content. Reserve those cells before splitting a long
+                        # address so that the resulting carried run still fits.
+                        before, after = pos - 1, pos + 1
+                        while before >= 0 and part[before].text[-1:] in OPEN:
+                            measure_width -= part[before].width
+                            before -= 1
+                        while after < len(part) and part[after].text[:1] in CLOSE:
+                            measure_width -= part[after].width
+                            after += 1
+                    expanded.extend(address_fragments(atom, self.catalog, size,
+                                                       measure_width, self.section))
+                wrapped = self.hanging_lines('', size, first, width, bold,
+                                             hanging_punctuation=hanging, atoms=expanded)
+                rows.extend(ReadingRow(row, explicit_break=(j == len(wrapped) - 1
+                                                            and index + 1 < len(parts)))
+                            for j, row in enumerate(wrapped))
+            return rows
         if small and align == 'right':
-            rows = self.hanging_lines(text, size, width, width, bold, atoms=atoms_for(text))
+            rows = wrap(atoms_for(text), width)
             if len(rows) > 1:
                 parts = citation_parts(text)
                 if len(parts) > 1:
                     rows = [row for part in parts
-                            for row in self.hanging_lines(part, size, width, width, bold, atoms=atoms_for(part))]
+                            for row in wrap(atoms_for(part), width)]
             return rows
-        return self.hanging_lines(text, size, width - indent, width, bold,
-                                  hanging_punctuation=not small, atoms=atoms_for(text))
+        return wrap(atoms_for(text), width - indent, not small)
 
     def _paragraph_grid_leading(self, block, leading):
         if getattr(self, '_rule_material_style', None) == 'notice' and block.get('type') == 'heading':
@@ -417,14 +485,25 @@ class ReadingRules:
         planned = getattr(self, '_pending_note_rows', None)
         rows = (planned[1] if planned is not None and planned[0] is block
                 else self._reading_rows(text, width, size, bold, align, indent))
+        advances = [row_advance(row, size, grid_leading) for row in rows]
         for index, row in enumerate(rows):
             remaining = len(rows) - index
             need = row_ink_height(row, size)
+            # A prose paragraph must not leave a single line on either side of
+            # a page boundary. Notes retain their own definition-level policy.
+            short_prose = (block.get('style') != 'small' and '\n' not in text
+                           and len(rows) <= 3)
+            if (block.get('style') != 'small' and '\n' not in text and len(rows) >= 2
+                    and (index == 0 or remaining == 2)):
+                need = advances[index] + row_ink_height(rows[index+1], size)
+            if short_prose and index == 0:
+                need = sum(advances[index:-1]) + row_ink_height(rows[-1], size)
             if after_title:
                 need = max(need, size + 7.2)  # Under-title rule has visible ink below the ordinary descender.
-            if reserve_after and remaining <= 2:
-                need = ((remaining - 1) * grid_leading + after_title
-                        + row_ink_height(rows[-1], size) + reserve_after)
+            if reserve_after and (remaining <= 2 or short_prose and index == 0):
+                # Following blocks start after the full baseline advance,
+                # not at the bottom of the last visible glyph.
+                need = sum(advances[index:]) + after_title + reserve_after
             self.ensure(need if need <= self.usable else row_ink_height(row, size))
             inset = indent if index == 0 else 0
             xx = x + self.left - origin + inset
@@ -433,6 +512,7 @@ class ReadingRules:
                     and row and row[-1].text in '）」』】〉》'):
                 available += self.catalog.width('　', size, bold, self.section) / 2
             justify = (index + 1 < len(rows) and align == 'left'
+                       and not getattr(row, 'explicit_break', False)
                        and block.get('style') != 'small')
             gaps = justified_gaps(row, available, size) if justify else punctuation_gaps(row, size)
             if gaps and any(gaps) and hasattr(self, 'line_gaps'):
@@ -444,7 +524,7 @@ class ReadingRules:
                 self.line(row, xx, self.y, size, align, available)
             if after_title:
                 self._notice_heading_baseline = self.y + size
-            self.y += grid_leading
+            self.y += advances[index]
         self.gap(after_title)
         self.gap(gap)
 
@@ -458,7 +538,8 @@ class ReadingRules:
                 size, leading, bold, _, _, align, indent, before = self.paragraph_spec(block, width)
                 text = self.paragraph_body_text(block)
                 grid_leading = self._paragraph_grid_leading(block, leading)
-                height = (len(self._reading_rows(text, width, size, bold, align, indent)) * grid_leading
+                rows = self._reading_rows(text, width, size, bold, align, indent)
+                height = (sum(row_advance(row, size, grid_leading) for row in rows)
                           + leading - grid_leading + before)
                 self._remember_contact(block, width)
                 return height
@@ -497,6 +578,8 @@ class ReadingRules:
         frame = cloze_frame(self.gc) if self._is_cloze() else notice_frame(self.gc)
         offset = x - self.left - frame.outset_left
         needed = self.estimate_block(block, width)
+        # A following glossary reserves the article's tail, not its whole
+        # frame: moving the frame here could strand the already drawn heading.
         keep = needed if needed <= self.usable else frame.before + frame.top + 2 * self.leading
         self.ensure(self.opening_keep_height(block, keep, width))
         self.gap(frame.before)
@@ -511,9 +594,11 @@ class ReadingRules:
         if self._is_cloze():
             self._cloze_material_depth = depth + 1
         try:
-            self.blocks(block.get('blocks', []), self.left + offset + frame.inset_left,
-                        outer_width - frame.inset_left - frame.inset_right,
-                        tail_reserve=frame.bottom)
+            with self.flowing_frame(frame.top):
+                self.blocks(block.get('blocks', []), self.left + offset + frame.inset_left,
+                            outer_width - frame.inset_left - frame.inset_right,
+                            tail_reserve=frame.bottom + (frame.after + block['_reserve_after']
+                                if block.get('_reserve_after') else 0))
         finally:
             self._cloze_material_depth = depth
             self._rule_material_style = previous_style

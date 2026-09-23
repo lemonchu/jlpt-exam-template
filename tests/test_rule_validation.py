@@ -23,6 +23,15 @@ class RuleValidationTests(unittest.TestCase):
                 with self.subTest(file=path, group=group['id']):
                     validate_rule_content(group)
 
+    def test_glossary_definitions_are_outside_frames_but_inline_notes_and_document_cautions_stay(self):
+        note = {'type': 'paragraph', 'style': 'small', 'text': '（注１）単語：意味'}
+        frame = {'type': 'box', 'blocks': [note]}
+        with self.assertRaisesRegex(ValueError, 'outside material boxes'):
+            validate_rule_content(self.group([frame]))
+        frame['blocks'] = [{'type': 'paragraph', 'text': '（注1）本文の開始'},
+                           {'type': 'paragraph', 'style': 'small', 'text': '※応募時の注意'}]
+        validate_rule_content(self.group([frame, note]))
+
     def test_notice_is_not_silently_approximated_in_vocabulary(self):
         block = {'type': 'box', 'rule_style': 'notice', 'blocks': []}
         with self.assertRaisesRegex(ValueError, 'top-level reading box'):

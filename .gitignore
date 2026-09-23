@@ -32,3 +32,27 @@ __pycache__/
 *.log
 *.xdv
 *.synctex.gz
+
+# Machine-local work journal and its agent entry point. Never commit these.
+/.local-journal/
+/AGENTS.md
+
+# Public sample banks and blueprints are an explicit allowlist.
+/content/*
+!/content/common/
+!/content/paper-a/
+!/content/paper-b/
+!/content/paper-2014-12/
+/blueprints/*
+!/blueprints/components.yaml
+!/blueprints/listening.yaml
+!/blueprints/written.yaml
+!/blueprints/2014-12-written.yaml
+
+# Local annual-paper imports, assets and source-review records.
+/resources/assets/batch-*/
+/resources/assets/2018-12-calendar.pdf
+/resources/assets/2022-07-L1-q6.pdf
+/tools/batch_*/
+/docs/N1-*
+/tests/test_n1_source_corrections.py

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Render a generated scene using caller-supplied semantic text."""
-import argparse,json,os,re,shutil,subprocess,sys
+import argparse,json,math,os,re,shutil,subprocess,sys
 from dataclasses import dataclass,field
 from pathlib import Path
 from functools import lru_cache
@@ -133,6 +133,28 @@ def supplied_slots(value,run):
     return result
 
 def number(x):return format(float(x),'.12g')
+
+def compact_scene_numbers(value):
+    """Write scene numbers at the renderer's existing precision, without reflow.
+
+    Keep full precision while measuring and composing. Only the serialized
+    drawing is shortened, so its run/image arguments remain exactly the same
+    TeX numbers as before. Text and embedded PDF vector programs stay opaque.
+    """
+    if isinstance(value, dict):
+        return {key: compact_scene_numbers(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [compact_scene_numbers(item) for item in value]
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError('Scene numbers must be finite')
+        compact = float(number(value))
+        if compact.is_integer() and (compact != 0 or math.copysign(1, compact) > 0):
+            integer = int(compact)
+            if len(str(integer)) <= len(str(compact)):
+                return integer
+        return compact
+    return value
 
 def _load_inputs(args):
     resources=Path(args.resources).resolve();out=Path(args.output_dir).resolve()

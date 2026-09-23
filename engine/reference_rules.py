@@ -10,6 +10,7 @@ import re
 
 from inline import measure, parse, plain
 from reading_rules import justified_gaps
+from reference_document import ReferenceDocumentRules
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,7 @@ class GuidePlan:
     height: float = 0.0
 
 
-class ReferenceRules:
+class ReferenceRules(ReferenceDocumentRules):
     """Opt-in document style; other reference material follows ordinary blocks."""
 
     def block(self, block, x=None, width=None):

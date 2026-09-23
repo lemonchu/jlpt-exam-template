@@ -88,6 +88,12 @@ class ChoiceRuleTests(unittest.TestCase):
         plan = layout.choice_metrics({'prompt': '説明文\n本文', 'options': ['甲', '乙', '丙', '丁']})
         self.assertEqual(plan['prompt_insets'], [CHOICE.prompt_inset(0)] * 2)
 
+    def test_ordering_scenario_label_is_not_justified_across_a_hard_break(self):
+        layout = ChoiceProbe()
+        rows = layout._ordering_rows('（ホームページで）\nここに __　　　__ __★__ __　　　__ __　　　__。', 11.3)
+        self.assertEqual(''.join(a.text for a in rows[0]), '（ホームページで）')
+        self.assertTrue(all(gap <= 0 for gap in rows[0].gaps))
+
     def test_explicit_option_newlines_are_preserved_even_when_the_text_fits(self):
         layout = ChoiceProbe()
         plan = layout.choice_metrics({'prompt': '本文', 'options': ['甲乙\n丙', '丙', '丁', '戊']})

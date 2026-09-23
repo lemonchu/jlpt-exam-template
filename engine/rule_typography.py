@@ -30,6 +30,11 @@ def number_advance(char, size):
     return size * .5892 if char in ':：' else 1.5 * size - _CJK_ADVANCES.get(round(size, 6), size)
 
 
+def note_baseline_offset(atom, size):
+    """Keep the small note below an underline instead of drawing through it."""
+    return (6.9804 + (3.0 if atom.underline else 0.0)) * size / 11.3
+
+
 def material_number_atoms(atoms, catalog, size, section):
     """Compact multi-digit quantities without substituting ASCII glyphs.
 
@@ -203,6 +208,14 @@ def ruby_layout(atom, glyph_widths, size, *, tracking=0, available_width=None):
 class TypographyRules:
     """Add relative ruby and note placement to the common base-line renderer."""
 
+    def ruby_top_overhang(self, atoms, size):
+        """Measure the same ruby glyph plan used when drawing a table/option."""
+        return max((glyph.above + glyph.size - size
+                    for atom in atoms if atom.ruby
+                    for glyph in ruby_layout(atom, [self.catalog.width(char, size, atom.bold, self.section)
+                                                   for char in atom.text], size,
+                                             available_width=atom.width)), default=0)
+
     def tracking_units(self, atom):
         return 1 if isinstance(atom, MaterialNumber) else super().tracking_units(atom)
 
@@ -289,7 +302,7 @@ class TypographyRules:
                 note_x = origin - 3.17 * scale
                 note_size = 6.4 * scale
                 for char in atom.annotation:
-                    self.glyph(char, note_size, note_x, baseline + 6.9804 * scale, False, color)
+                    self.glyph(char, note_size, note_x, baseline + note_baseline_offset(atom, size), False, color)
                     note_x += self.catalog.width(char, note_size, False, self.section)
             cursor += atom.width
             if flexible:

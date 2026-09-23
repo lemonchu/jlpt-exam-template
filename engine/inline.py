@@ -14,15 +14,25 @@ class Atom:
     annotation_span: int=0
     ruby_parts: tuple=()
 
+@dataclass
+class NetworkAddress(Atom):
+    """An email/URL, whose internal letter spacing must remain natural."""
+
 OPEN='（([｛{「『【〈《〔'
 CLOSE='、。，．・：；？！ー〜～）)]｝}」』】〉》〕ァィゥェォッャュョぁぃぅぇぉっゃゅょ々'
 # A's measured cloze frames use half-em side spacing, compressed before closing punctuation.
 REFERENCE_BOX_CLOSING='、。，．・：；？！）)]｝}」』】〉》'
 REFERENCE_BOX_PATTERN=r'〔([0-9]+)(-[A-Za-z])?〕'
 REFERENCE_BOX_RE=re.compile(REFERENCE_BOX_PATTERN)
-TOKEN_RE=re.compile(REFERENCE_BOX_PATTERN+r'|（[ \u3000]+）|[A-Za-z0-9]+(?:[.\-’\'][A-Za-z0-9]+)*')
+EDITORIAL_LABEL_PATTERN=r'[（(](?:注[ \u3000]*[0-9０-９]*|中略|前略|後略)[）)]'
+EDITORIAL_LABEL_RE=re.compile(EDITORIAL_LABEL_PATTERN)
+TOKEN_RE=re.compile(REFERENCE_BOX_PATTERN+'|'+EDITORIAL_LABEL_PATTERN+r'|（[ \u3000]+）|[A-Za-z0-9]+(?:[.\-’\'][A-Za-z0-9]+)*')
+ADDRESS_RE=re.compile(
+    r'(?:https?://|www\.)[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&+,;=%-]*'
+    r'|[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}',
+    re.IGNORECASE)
 
-def parse(text,bold=False,underline=False):
+def parse(text,bold=False,underline=False,*,preserve_addresses=False):
     """Markup is deliberately small; malformed paired markup is an error."""
     if not isinstance(text,str):raise TypeError(f'Inline text must be a string, got {type(text).__name__}')
     out=[];i=0
@@ -31,7 +41,7 @@ def parse(text,bold=False,underline=False):
             end=text.find('}}',i+2)
             if end<0 or '|' not in text[i+2:end]:raise ValueError('Invalid note anchor')
             label,inner=text[i+2:end].split('|',1)
-            children=parse(inner,bold,underline)
+            children=parse(inner,bold,underline,preserve_addresses=preserve_addresses)
             if not children:raise ValueError('Empty note anchor')
             span=sum(sum(not c.isspace() for c in child.text) for child in children)
             children[0]=replace(children[0],annotation=('（'+label+'）') if label.startswith('注') else label,
@@ -43,7 +53,8 @@ def parse(text,bold=False,underline=False):
             if end<0:raise ValueError(f'Unclosed inline marker {marker!r} in {text!r}')
             inner=text[i+2:end]
             if marker=='__' and re.fullmatch(r'[ 　]+',inner):out.append(Atom(inner,bold,True))
-            else:out += parse(inner,bold or marker=='**',underline or marker=='__')
+            else:out += parse(inner,bold or marker=='**',underline or marker=='__',
+                              preserve_addresses=preserve_addresses)
             i=end+2;continue
         if text[i]=='｜':
             m=re.match(r'｜([^《\n]+)《([^》\n]+)》',text[i:])
@@ -52,11 +63,48 @@ def parse(text,bold=False,underline=False):
             if parts and (len(parts)!=len(m[1]) or not all(parts)):
                 raise ValueError('Partitioned ruby requires one nonempty reading per base character')
             out.append(Atom(m[1],bold,underline,''.join(parts) if parts else m[2],ruby_parts=parts));i+=len(m[0]);continue
+        if preserve_addresses:
+            address=ADDRESS_RE.match(text,i)
+            if address:
+                # Sentence punctuation is outside an address; fullwidth CJK
+                # punctuation is already excluded from the ASCII pattern.
+                token=address[0].rstrip('.,;:!')
+                out.append(NetworkAddress(token,bold,underline));i+=len(token);continue
         # A fill-in blank is indivisible; ordinary Latin words also stay together.
         m=TOKEN_RE.match(text,i)
         if m:out.append(Atom(m[0],bold,underline));i+=len(m[0]);continue
         out.append(Atom(text[i],bold,underline));i+=1
     return out
+
+def address_fragments(atom,catalog,size,width,section=''):
+    """Keep an address whole when possible, then prefer URL/mail separators.
+
+    Only an address longer than the applicable line measure reaches this path.
+    A path component without any safe delimiter may finally break at a glyph
+    boundary, preserving every character instead of overflowing or truncating.
+    All fragments retain their address type so justification cannot spread them.
+    """
+    if not isinstance(atom,NetworkAddress) or atom.width<=width+1e-7:
+        return [atom]
+    result=[];remaining=atom.text;offset=0
+    scheme_end=atom.text.find('://')+3 if '://' in atom.text else 0
+    while remaining:
+        used=0;end=0
+        for char in remaining:
+            advance=catalog.width(char,size,atom.bold,section)
+            if used+advance>width+1e-7:break
+            used+=advance;end+=1
+        if not end:raise ValueError('An address glyph exceeds line width: '+remaining[0])
+        if end<len(remaining):
+            safe=[i+1 for i,char in enumerate(remaining[:end])
+                  if char in '/?&#@.-' and offset+i+1>scheme_end]
+            if safe:end=safe[-1]
+        fragment=replace(atom,text=remaining[:end],
+                         annotation=atom.annotation if not result else '',
+                         annotation_span=atom.annotation_span if not result else 0)
+        result.extend(measure([fragment],catalog,size,section))
+        remaining=remaining[end:];offset+=end
+    return result
 
 def measure(atoms,catalog,size,section=''):
     result=[]
@@ -87,7 +135,7 @@ def lines(text,catalog,size,width,section='',bold=False):
     # An unusually long Latin token may break character by character.
     expanded=[]
     for a in atoms:
-        if a.width>width and len(a.text)>1 and not a.ruby:
+        if a.width>width and len(a.text)>1 and not a.ruby and not EDITORIAL_LABEL_RE.fullmatch(a.text):
             expanded += measure([replace(a,text=c) for c in a.text],catalog,size,section)
         else:expanded.append(a)
     result=[];line=[];used=0

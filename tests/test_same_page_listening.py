@@ -6,6 +6,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+import fitz
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'engine'))
@@ -15,6 +16,60 @@ from test_written_rules import Catalog
 
 
 class SamePageListeningTests(unittest.TestCase):
+    def image_panel(self, width=120, height=60, after_options=False):
+        layout = self.layout()
+        layout.resources = layout.out / 'test-resources'
+        assets = layout.resources / 'assets'
+        assets.mkdir(parents=True)
+        with fitz.open() as document:
+            document.new_page(width=width, height=height)
+            document.save(assets / 'diagram.pdf')
+        group = self.panel_group(example=False)
+        item = group['items'][0]
+        item['stimulus'] = [{'type': 'image', 'asset': 'diagram.pdf', 'width': width}]
+        if after_options:
+            item['stimulus_position'] = 'after_options'
+        return layout, group
+
+    def test_listening_image_is_drawn_on_the_option_page_without_overlap(self):
+        for after in (False, True):
+            with self.subTest(after_options=after):
+                layout, group = self.image_panel(after_options=after)
+                layout.render_group(group, {'sidebar': False})
+                page = layout.pages[-1]
+                images = [c for c in page['commands'] if c['type'] == 'image']
+                self.assertEqual(len(images), 1)
+                image = images[0]
+                top = layout.H - image['y'] - image['height']
+                options = [g for g in layout.semantic_glyphs
+                           if g['page_ref'] == id(page) and g['role'] == 'listening-option']
+                self.assertEqual(len(options), 4)
+                if after:
+                    self.assertGreater(top, max(g['y'] for g in options))
+                else:
+                    self.assertLess(top + image['height'], min(g['y'] - g['size'] for g in options))
+                self.assertEqual(layout.item_records[-1]['pages'], [len(layout.pages)])
+
+    def test_oversized_listening_image_is_rejected_before_panel_is_drawn(self):
+        layout, group = self.image_panel(width=300, height=400)
+        with self.assertRaisesRegex(ValueError, 'Listening panel exceeds its allocated space'):
+            layout.render_group(group, {'sidebar': False})
+        self.assertFalse(any(c['type'] == 'image' for p in layout.pages for c in p['commands']))
+
+    def test_embedded_choices_draw_numbered_diagram_without_duplicate_text_options(self):
+        layout, group = self.image_panel(width=220, height=250)
+        group['items'][0]['options_embedded_in_stimulus'] = True
+        layout.render_group(group, {'sidebar': False})
+        self.assertEqual(sum(c['type'] == 'image' for c in layout.pages[-1]['commands']), 1)
+        self.assertFalse(any(g['role'] == 'listening-option' for g in layout.semantic_glyphs))
+        self.assertEqual(layout.item_records[-1]['options'], 4)
+
+    def test_embedded_choices_cannot_silently_hide_text_when_diagram_is_missing(self):
+        layout, group = self.image_panel()
+        group['items'][0].update(options_embedded_in_stimulus=True, stimulus=[])
+        with self.assertRaisesRegex(ValueError, 'require a listening stimulus image'):
+            layout.render_group(group, {'sidebar': False})
+
     def test_memo_cannot_reserve_less_space_than_its_visible_label(self):
         layout = self.layout()
         self.seed(layout)

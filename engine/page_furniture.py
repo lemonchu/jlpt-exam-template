@@ -137,7 +137,7 @@ def _sidebar(layout, pn, band):
     height = float(band.get('height', defaults['height']))
     y = float(band.get('y', defaults['y']))
     x = float(band.get('x', layout.W - 28.204 if right and original_width
-                       else .014771 if original_width else layout.W - width if right else 0.0))
+                       else .01477 if original_width else layout.W - width if right else 0.0))
     # A tiny original bleed over the paper's right edge is intentional.
     if width <= 0 or height <= 0 or y < 0 or y + height > layout.H or x < 0 or x + width > layout.W + .05:
         raise ValueError('Sidebar geometry exceeds the page')

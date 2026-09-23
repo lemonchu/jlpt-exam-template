@@ -3,6 +3,7 @@
 All text is emitted by ComponentLayout through the common scene renderer.
 """
 from pathlib import Path
+from contextlib import contextmanager
 import shutil
 import fitz
 from inline import lines,parse
@@ -31,7 +32,20 @@ class MaterialPrimitives:
     def ensure(self,height):
         if height>self.usable+1e-6:raise ValueError(f'An unbreakable element is {height:.1f} bp tall; usable page height is {self.usable:.1f} bp')
         if self.page is None:self.new_page()
-        elif self.y+height>self.bottom+1e-6:self.new_page()
+        elif self.y+height>self.bottom+1e-6:
+            padding=getattr(self,'_flow_frame_top_padding',0)
+            if height+padding>self.usable+1e-6:
+                raise ValueError('An unbreakable element and its continuation frame padding do not fit on one page')
+            self.new_page()
+            self.y+=padding
+
+    @contextmanager
+    def flowing_frame(self,top_padding):
+        """Reserve the frame's inside top margin on continuation pages too."""
+        previous=getattr(self,'_flow_frame_top_padding',0)
+        self._flow_frame_top_padding=previous+top_padding
+        try:yield
+        finally:self._flow_frame_top_padding=previous
 
     def opening_keep_height(self, block, default, width, *, prefix=0, consume=True):
         """Relax only the planned opening box's optional whole-material keep.
@@ -180,6 +194,13 @@ class MaterialPrimitives:
         elif t=='vertical':self.vertical(b,x,width)
         else:raise ValueError(f'Unknown stimulus block type {t!r}')
 
+    def ruby_top_overhang(self,atoms,size):
+        """Height above a nominal line top in the shared baseline renderer."""
+        if not any(atom.ruby for atom in atoms):return 0
+        ruby_size=5.6 if abs(size-11.3)<.01 else round(size*.5,1)
+        above=13.3367 if abs(size-14.2)<.01 else 10.6223
+        return max(0,above+ruby_size-size)
+
     def table_rows(self,b,width):
         rows=b.get('rows',[])
         if not rows or not all(isinstance(r,list) for r in rows):raise ValueError('Table rows must be a non-empty list of lists')
@@ -208,10 +229,27 @@ class MaterialPrimitives:
         header_alignments=b.get('header_alignments',alignments)
         if not isinstance(header_alignments,list) or len(header_alignments)!=n or any(a not in ('left','center','right') for a in header_alignments):
             raise ValueError('Table header alignments must provide left, center, or right for every column')
-        prepared=[];heights=[]
+        prepared=[]
         for i,row in enumerate(rows):
             cells=[self.get_lines(str(s),size,w-2*pad_x,bold=header_bold and i<headers) for s,w in zip(row,widths)]
-            prepared.append(cells);heights.append(max(len(c) for c in cells)*lead+pad_top+pad_bottom)
+            prepared.append(cells)
+        # Padding is clear space above the ruby ink, not merely above its base
+        # text. Borderless alignment tables have no cell edge to clear.
+        overhang=0
+        if b.get('borders',True) or (headers and b.get('header_fill',True)):
+            overhang=max((self.ruby_top_overhang(cell[0],size)
+                          for row in prepared for cell in row if cell),default=0)
+        heights=[]
+        for row in prepared:
+            count=max(len(c) for c in row)
+            height=count*lead+pad_top+pad_bottom
+            if overhang:
+                # Existing full-line leading often already leaves enough room.
+                # Move the text down into it; enlarge only when the visible
+                # final line would consume the requested bottom padding.
+                height=max(height,(count-1)*lead+pad_top+overhang+size*1.25+pad_bottom)
+            heights.append(height)
+        pad_top+=overhang
         return (widths,heights,prepared,size,lead,alignments,header_alignments,pad_x,pad_top)
 
     def table_geometry(self,b,x,width):

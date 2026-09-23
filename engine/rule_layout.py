@@ -16,9 +16,10 @@ from rule_typography import TypographyRules
 from written_rules import WrittenRules
 from vertical_rules import VerticalRules
 from rule_validation import validate_rule_content, validate_rule_dimensions
+from spread_alignment import SpreadAlignment
 
 
-class RuleLayout(GroupFlow, OrderingTemplates, ListeningRules, ChoiceRules, ReferenceRules, VerticalRules, ReadingRules,
+class RuleLayout(SpreadAlignment, GroupFlow, OrderingTemplates, ListeningRules, ChoiceRules, ReferenceRules, VerticalRules, ReadingRules,
                  WrittenRules, TypographyRules, ComponentLayout):
     def __init__(self, catalog, blueprint, resources, out, reference):
         validate_rule_dimensions(blueprint.get('page', {}))
@@ -33,13 +34,27 @@ class RuleLayout(GroupFlow, OrderingTemplates, ListeningRules, ChoiceRules, Refe
             return 'listening', self.listening_heading_plan(group, config)
         return 'written', self.written_heading_plan(group, config)
 
-    def begin_group(self, group, config):
+    def prepare_group_page(self, group, config):
         self._pending_heading = self._opening_choice = None
         self._opening_listening = None
         self._opening_split_block = self._opening_split_minimum = None
         self._split_group_opening = False
         if config.get('new_page', True):
             self.new_page()
+            if group.get('kind') in ('reading', 'cloze'):
+                heading = self.heading_plan(group, config)
+                opening = self.first_item_keep(group, config)
+                adjustment = require_number(config.get('body_start_adjust', 0),
+                                            'body_start_adjust must be a number')
+                # A frame may fit a blank page but not the space below this
+                # group's heading. Relax its optional whole-frame keep here,
+                # just as for a group continuing on the current page.
+                if (opening.get('split_block') is not None
+                        and heading[1]['height'] + adjustment + opening['preferred'] > self.usable + 1e-6):
+                    self._split_group_opening = True
+                    self._opening_split_block = opening['split_block']
+                    self._opening_split_minimum = opening.get('split_minimum')
+                self._pending_heading = heading
             return
         if self.page is None:
             self.new_page()
@@ -100,6 +115,7 @@ class RuleLayout(GroupFlow, OrderingTemplates, ListeningRules, ChoiceRules, Refe
     def render_group(self, group, config):
         validate_rule_dimensions(config)
         validate_rule_content(group)
+        self.validate_listening_pagination(group, config)
         if not isinstance(config.get('new_page', True), bool):
             raise ValueError('new_page must be true or false')
         super().render_group(group, config)
